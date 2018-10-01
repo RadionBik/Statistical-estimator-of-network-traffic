@@ -1,4 +1,4 @@
-# Statitistical-estimator-of-network-traffic
+# Statistical estimator of network traffic
 
 The program consists of 2 main parts:
 
@@ -7,13 +7,15 @@ The program consists of 2 main parts:
 
 The estimator takes a pcap file and for all (or specified in addresses_to_check.txt) flows extracts the Payload Length and the Inter-Arrival Time parameters. Afterwards, EM-algorithm is applied to fit a gaussian mixture (up to 5 components) to the parameters and the trained model is saved to a file in the obj/ folder.
 
-E.g.:
+Usage examples:
     
     ./stat_estimator.py -p traffic_dumps/rtp_711.pcap -f all --plot --save-plot
+    
+    ./stat_estimator.py -p ../voiceTraces/skypeLANhome.pcap -i flow
 
 The generator uses the saved EM-model to generate packets with length and delay drawn from the estimated distributions. The side has to be specified, either 'local' (the estimated side) or 'remote' (remote end).   
 
-E.g.:
+Usage examples:
 
 local side:
     

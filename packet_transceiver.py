@@ -9,14 +9,6 @@ local side:
 remote side;
 ./packet_transceiver.py -d 192.168.88.10 -o obj/skypeLANhome_UDP_192_168_0_102_18826_auto_components.pkl -m remote
 
-https://stackoverflow.com/questions/582336/how-can-you-profile-a-script
-
-1. pip install snakeviz
-
-2. python -m cProfile -o temp.dat <PROGRAM>.py
-
-3. snakeviz temp.dat
-
 '''
 import cProfile
 
