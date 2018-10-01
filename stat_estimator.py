@@ -548,7 +548,6 @@ def main():
     #kde_estimations = get_KDE(extractedTraffic)
 
     #plot_KDE_traffic(extractedTraffic)
-    #
 
     saveEstimationsToDisk(args, identifiers, \
                         [estimatedParameterEM, trafficExtremeValues])
@@ -556,9 +555,7 @@ def main():
     printEstimatedParametersEM(estimatedParameterEM)
 
     if args.plot:
-        #plotEstimatedDistributions(estimatedParameterEM)
         plot_hist_kde_em(extractedTraffic, kde_estimators, estimatedParameterEM, logScale=False, saveToFile=args.save_plot)
-    #else:
 
     if args.hist:
         plot_hist(traffic=extractedTraffic, logScale=False)

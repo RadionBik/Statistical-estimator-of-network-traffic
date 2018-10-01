@@ -452,8 +452,9 @@ def plot_hist_kde_em(traffic, kde_estimators, em_estimators=None, logScale=True,
                 fig.tight_layout()
                 fig.subplots_adjust(top=0.88)
         if saveToFile:
-            print('Saved figure as {}'.format('hist_'+mod_addr(device).replace(' ','_')+'_'+'.svg'))
-            plt.savefig('stat_figures'+os.sep+'hist_' +mod_addr(device)+'_'+'.svg')
+            figure_name = 'hist_'+mod_addr(device).replace(' ','_')+'_'+'.svg'
+            print('Saved figure as {}'.format(figure_name))
+            plt.savefig(figure_name)
             # else:
     plt.draw()
     plt.pause(0.001)
