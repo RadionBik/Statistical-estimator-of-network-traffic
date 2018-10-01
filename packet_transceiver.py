@@ -19,6 +19,8 @@ import socketserver
 import subprocess
 import argparse
 from helper_functions import *
+from iterate_packets import *
+
 import random
 
 class serverHandler(socketserver.BaseRequestHandler):
@@ -94,7 +96,8 @@ def sync_remote(ip):
         time.sleep(0.2)
 
 #@profile
-def iteratePacketPerDevice(estimatedDeviceParams, trafficExtremeValues, direction):
+
+def iterate_packet_per_device_py(estimatedDeviceParams, trafficExtremeValues, direction):
     '''
     generatePacketIterator() returns properties of a single packet given the EM-estimations,
     the max and min values of the parameters for a specific device and direction
@@ -123,9 +126,9 @@ def iteratePacketPerDevice(estimatedDeviceParams, trafficExtremeValues, directio
             while not ((genParam <= paramLimit['max']) and (genParam >= paramLimit['min'])):
                 if parameter == 'pktLen':
                     #packet length in bytes must be integer
-                    genParam = round(np.asscalar(random.gauss(mix.means_[component], np.sqrt(mix.covariances_[component]))))
+                    genParam = round(np.asscalar(np.random.normal(mix.means_[component], np.sqrt(mix.covariances_[component]))))
                 else:
-                    genParam = np.asscalar(random.gauss(mix.means_[component], np.sqrt(mix.covariances_[component])) )
+                    genParam = np.asscalar(np.random.normal(mix.means_[component], np.sqrt(mix.covariances_[component])) )
 
         #if there is a list, send its properties
         else:
@@ -141,6 +144,7 @@ def iteratePacketPerDevice(estimatedDeviceParams, trafficExtremeValues, directio
     #pr.print_stats(sort='time')
     yield generatedPacketParameters
 
+
 def generate_packets(trafficParameters, args, direction, sock, remotePort=None):
 
     '''
@@ -150,6 +154,7 @@ def generate_packets(trafficParameters, args, direction, sock, remotePort=None):
 
     https://stackoverflow.com/questions/38319606/how-to-get-millisecond-and-microsecond-resolution-timestamps-in-python
     
+    https://www.gnu.org/software/gsl/doc/html/randist.html#the-multinomial-distribution
 
     '''
     estimatedParameterEM, trafficExtremeValues = trafficParameters
@@ -162,7 +167,7 @@ def generate_packets(trafficParameters, args, direction, sock, remotePort=None):
     while time.time() < generateUntil:
         for device in estimatedParameterEM:
             #print(device)
-            packetGenerator = iteratePacketPerDevice(estimatedParameterEM[device], trafficExtremeValues[device], direction)
+            packetGenerator = iterate_packet_per_device_py(estimatedParameterEM[device], trafficExtremeValues[device], direction)
             packet = dict(next(packetGenerator))
             #until we have traffic saved as lists
             try:
