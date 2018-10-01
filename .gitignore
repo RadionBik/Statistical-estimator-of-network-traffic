@@ -1,0 +1,21 @@
+figures/
+log/
+#traffic_dumps/
+temp_py/
+__pychache__
+*.prof
+*.ipynb
+*.docx
+*.pkl
+*.pyc
+*.sh
+*.pcap
+*.svg
+#stat_figures/*.svg
+test_wrapper.py
+ndpiReader
+
+#add a file to each dir for structuring
+!rtp_711.pcap
+!rtp_711_UDP_10_1_3_143_5000_auto_components.pkl
+!hist_UDP_10_1_3_143_5000_10_1_6_18_2006_.svg
