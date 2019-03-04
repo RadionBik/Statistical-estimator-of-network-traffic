@@ -28,3 +28,9 @@ remote side:
 ## Jupyter notebooks
 
 There are 2 notebooks (with Markov models and Reccurent Neural Networks) in the repo, that are more up-to-date than the main program, where all the research activity goes on. Moreover, due to active development of the algorithms within the notebooks, some functions may be broken at the moment, but will be fixed after better modeling algorithms will be selected. 
+
+## Installing
+
+Just pull the repo, and source into virtualenv within the *estimator_libs* folder, such as:
+
+    source estimator_libs/bin/activate
