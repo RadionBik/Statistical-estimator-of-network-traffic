@@ -18,8 +18,7 @@ import time
 import socketserver
 import subprocess
 import argparse
-from helper_functions import *
-from iterate_packets import *
+from traffic_helpers import *
 
 import random
 

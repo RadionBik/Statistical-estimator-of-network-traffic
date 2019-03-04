@@ -15,7 +15,7 @@ from sklearn import mixture
 import numpy as np
 import random
 from collections import defaultdict, Counter
-from helper_functions import * 
+from traffic_helpers import * 
 import dpkt
 from subprocess import Popen, PIPE, run
 import re
@@ -34,78 +34,27 @@ def modifyTrafficDict(traffic):
                 traffic_per_device[device][direction] = traffic[direction][group][device]
     return traffic_per_device
 
-def detect_flows(pcapfile):
-    pass
-
-
-def extractVoipStats(pcapfile, isTunInt=False):
-    '''
-    extractVoipStats() takes pcap file, processes it with nDPI to find RTP and Skype flows,
-    and returns dict with packet features within the finded flows: 
-    ts, pktLen, Inter-Arrival-Time.
-
-    if pcap was captured on tun-interface, it must be specified via isTunInt var
-    '''
-    pipe = Popen(["./ndpiReader", "-i", pcapfile, "-v2"], stdout=PIPE)
+def get_voip_flow_list(pcapfile):
+    
+    pipe = Popen(["./ndpi_arch", "-i", pcapfile, "-v2"], stdout=PIPE)
     raw = pipe.communicate()[0].decode("utf-8")
 
     reg = re.compile(
-        r'(UDP) (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{1,5}) <?->? (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{1,5}) \[proto: [\d+\.]*\d+\/(RTP|Skype)*\]')
+        r'(UDP) (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{1,5}) <?->? (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{1,5}) \[proto: [\d+\.]*\d+\/(RTP|Skype.SkypeCall)*\]')
 
-    filter = {
-        'IPserver': [],
-        'IPclient': [],
-        'port': [],
-        'length': []
-    }
-
-    traffic = {}
+    flows = []
   
-    for capture in re.findall(reg, raw):
-        transp_proto, ip1, port1, ip2, port2, app_proto = capture
-        filter['IPserver'].append(ip1)
-        filter['IPclient'].append(ip2)
-        filter['port'].append(int(port1))
-        filter['port'].append(int(port2))
-        identifier = app_proto+' '+ip2+':'+port2+' '+ip1+':'+port1
-        traffic = {identifier : {'from': {'ts': [],'pktLen': [],'IAT': []}, 
-                                   'to': {'ts': [],'pktLen': [],'IAT': []}}}
-       
-    for ts, raw in dpkt.pcap.Reader(open(pcapfile, "rb")):
-        if (isTunInt):
-            ip = dpkt.ip.IP(raw)
-        else:
-            eth = dpkt.ethernet.Ethernet(raw)
-            ip = eth.data
-        # check if the packet is IP, TCP, UDP
-        if not isinstance(ip, dpkt.ip.IP):
-            continue
-        #filter out segments and datagrams without payload (e.g. SYN, SYN/ACK, etc.)
-        if len(ip.data.data) == 0:
-            continue
-        if isinstance(ip.data, dpkt.udp.UDP):
-            if (ip_to_string(ip.src) in filter['IPserver']) or (ip_to_string(ip.dst) in filter['IPserver']):
-                if ((ip.data.sport in filter['port']) and (ip.data.dport in filter['port'])) and len(raw) not in filter['length']:
-                    if ip_to_string(ip.src) == filter['IPclient'][0]:
-                        for flow in traffic:
-                            traffic[flow]['from']['ts'].append(ts)
-                            traffic[flow]['from']['pktLen'].append(len(ip.data.data))
+    for transp_proto, ip1, port1, ip2, port2, app_proto in re.findall(reg, raw):
+        flows.append(transp_proto+' '+ip1+':'+port1+' '+ip2+':'+port2)
 
-                    else:
-                        for flow in traffic:
-                            traffic[flow]['to']['ts'].append(ts)
-                            traffic[flow]['to']['pktLen'].append(len(ip.data.data))
+    if flows:
+        print('Detected the following VoIP flows:')
+        for flow in flows:
+            print(flow)
+    else:
+        exit('No VoIP flows detected')
 
-        else:
-            continue
-
-    print('Found the following RTP flows:')
-    for flow in traffic:
-        print(flow)
-        for direction in traffic[flow]:
-            traffic[flow][direction]['IAT'] = get_IAT(traffic[flow][direction]['ts'])
-            print('Pkt number from: ',len(traffic[flow][direction]['ts']))
-    return traffic
+    return flows
 
 def getFlowList(pcapfile):
     print('Extracting flow identifiers from {}...'.format(pcapfile))
@@ -151,7 +100,7 @@ def getFlowList(pcapfile):
 
     return identifiers
 
-def extractFlowStats(pcapfile, flows, min_samples_to_estimate=None, payloadOnly=True,):
+def extract_flow_stats(pcapfile, flows, min_samples_to_estimate=0, payloadOnly=True):
     
     print('Extracting flow features from {}...'.format(pcapfile))
     #create the layered dict
@@ -166,8 +115,10 @@ def extractFlowStats(pcapfile, flows, min_samples_to_estimate=None, payloadOnly=
     for identifier in flows:
         if identifiersType[identifier]!='flow':
                 continue
-        traffic[identifier] = {'from': {'ts': [],'pktLen': [],'IAT': []}, 
-                               'to': {'ts': [],'pktLen': [],'IAT': []}}
+        #traffic[identifier] = {'from': {'ts': [],'pktLen': [],'IAT': []}, 
+        #                       'to': {'ts': [],'pktLen': [],'IAT': []}}
+        traffic[identifier] = {'from': {'ts': [],'pktLen': []}, 
+                               'to': {'ts': [],'pktLen': []}}
 
 
     for ts, raw in dpkt.pcap.Reader(open(pcapfile, "rb")):
@@ -222,7 +173,7 @@ def extractFlowStats(pcapfile, flows, min_samples_to_estimate=None, payloadOnly=
     print('Found the following flows with # of packets > {}:'.format(min_samples_to_estimate))
     for identifier in traffic:
         for direction in traffic[identifier]:
-            traffic[identifier][direction]['IAT'] = get_IAT(traffic[identifier][direction]['ts'])
+            #traffic[identifier][direction]['IAT'] = get_IAT(traffic[identifier][direction]['ts'])
             print('{} pkt number {}: {}'.format(identifier,direction,len(traffic[identifier][direction]['ts'])))
 
     return traffic
@@ -327,7 +278,7 @@ def getNotEmptyIdentifiers(identifier, traffic):
     for identifier in traffic:
         for direction in traffic[identifier]:
             pass
-        if len(traffic[identifier][direction]['ts']) > 0:
+        if len(traffic[identifier][direction]['pktLen']) > 0:
             notEmptyIdentifiers.append(identifier)
 
     return notEmptyIdentifiers
@@ -411,6 +362,19 @@ def estimate_parameters_EM_BIC(traffic, min_samples_to_estimate=15):
 
     return gmm_estimates
 
+def get_dfs_within_percentiles(dfs, percentiles, min_samples_to_estimate):
+    
+    reduced_dfs = construct_dict_2_layers(dfs)
+    for device, direction, df in iterate_dfs_plus(dfs):
+        if df.shape[0] < min_samples_to_estimate:
+            continue
+        
+        upper_bound = np.percentile(df['IAT'], percentiles[1])
+        lower_bound = np.percentile(df['IAT'], percentiles[0])
+
+        reduced_dfs[device][direction] = df[ (df['IAT']>lower_bound) & (df['IAT']<upper_bound) ]
+    return reduced_dfs
+
 def get_data_dict_within_percentiles(data_dict, percentiles, min_samples_to_estimate):
     for device in data_dict:
         for direction in data_dict[device]:
@@ -435,25 +399,48 @@ def fix_const_pktLen(extractedTraffic):
                     else:
                         continue
 
+def craft_traffic_features(traffic):
+
+    orig_dfs = get_df_from_traffic(traffic)
+
+    for device, direction, df in iterate_dfs_plus(orig_dfs):
+        #apply window smoothing
+        #orig_dfs[device][direction]['pkt_var'] = (df['pktLen'] - df['pktLen'].mean())**2
+        #orig_dfs[device][direction]['iat_pkt_ratio'] = orig_dfs[device][direction]['IAT']/df['pktLen'] 
+        #iat_mean = orig_dfs[device][direction]['IAT'].mean()
+        #orig_dfs[device][direction]['iat_var'] = (orig_dfs[device][direction]['IAT'] - iat_mean)**2
+        #orig_dfs[device][direction]['iat_log'] = np.log10(orig_dfs[device][direction]['IAT'])
+        #orig_dfs[device][direction].index = pd.to_datetime(df['ts'], unit='s') - pd.to_datetime(df['ts'][0], unit='s')
+        
+        #orig_dfs[device][direction]['window_pkt'] = df['pktLen'].rolling('1S').sum()
+        start_index = df.index[0]
+        offset_index = start_index + pd.to_timedelta(10, unit='s')
+        #orig_dfs[device][direction] = df[ offset_index:]
+        #print(orig_dfs[device][direction].head())
+        
+    return orig_dfs 
 
 def getTrafficFeatures(pcapfile, fileIdent, typeIdent, percentiles=None, min_samples_to_estimate=None):
     identifiers = getAddressList(fileIdent, typeIdent)
 
     if typeIdent=='flow':
-        extractedTraffic = extractFlowStats(pcapfile, identifiers, min_samples_to_estimate)
+        extractedTraffic = extract_flow_stats(pcapfile, identifiers, min_samples_to_estimate)
     elif typeIdent=='MAC' or typeIdent=='IP':
         extractedTraffic = extractHostStatsDpkt(pcapfile, identifiers, typeIdent, min_samples_to_estimate)
     else:
         exit('wrong identifier type. See help')
 
+
+    #add more features e.g. IAT, correlation
+    traffic_dfs = craft_traffic_features(extractedTraffic)
     if percentiles:
-        extractedTraffic = get_data_dict_within_percentiles(extractedTraffic, percentiles, min_samples_to_estimate)
+        traffic_dfs = get_dfs_within_percentiles(traffic_dfs, percentiles, min_samples_to_estimate)
     
-    fix_const_pktLen(extractedTraffic)
+    fix_const_pktLen(traffic_dfs)
     #len(list(Counter(extractedTraffic[device][direction][parameter])))
-    identifiers = getNotEmptyIdentifiers(identifiers, extractedTraffic)
+    identifiers = getNotEmptyIdentifiers(identifiers, traffic_dfs)
     print('Finished extracting packet properties')
-    return extractedTraffic, identifiers
+    return traffic_dfs, identifiers
 
 def getTrafficEstimations(extractedTraffic, componentNumb, min_samples_to_estimate=15):
         

@@ -1,22 +1,29 @@
 figures/
 log/
-#traffic_dumps/
+jupyter_notebooks/
+traffic_dumps/
 temp_py/
+#stat_figures/
 __pychache__
+.ipynb_checkpoints/
+rnn_models/
 *.prof
-*.ipynb
+#*.ipynb
 *.docx
 *.pkl
 *.pyc
 *.sh
 *.pcap
 *.svg
+deviceStat.ipynb
 #stat_figures/*.svg
-test_wrapper.py
+test_*
 ndpiReader
+ndpi_arch
 extractPacketStats.py
+compare_pcaps.py
 
 #add a file to each dir for structuring
-!rtp_711.pcap
+!skypeLANhome.pcap
 !rtp_711_UDP_10_1_3_143_5000_auto_components.pkl
-!hist_UDP_10_1_3_143_5000_10_1_6_18_2006_.svg
+#!hist_UDP_10_1_3_143_5000_10_1_6_18_2006_.svg
