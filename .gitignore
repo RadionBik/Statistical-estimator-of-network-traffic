@@ -1,7 +1,8 @@
 figures/
 log/
 jupyter_notebooks/
-traffic_dumps/
+#traffic_dumps/*
+
 temp_py/
 #stat_figures/
 __pychache__
@@ -26,6 +27,6 @@ extractPacketStats.py
 compare_pcaps.py
 
 #add a file to each dir for structuring
-!skypeLANhome.pcap
 !rtp_711_UDP_10_1_3_143_5000_auto_components.pkl
 #!hist_UDP_10_1_3_143_5000_10_1_6_18_2006_.svg
+!*/skypeLANhome.pcap
