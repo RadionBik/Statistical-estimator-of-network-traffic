@@ -30,13 +30,30 @@ def get_df_from_traffic(traffic):
     return traffic_df
 
 def access_traffic_df(func):
-    def func_wrapper(traffic):
+    def func_wrapper(traffic, *args, **kwargs):
         for device in traffic:
             for direction in traffic[device]:
-                func(traffic[device][direction])
+                func(traffic[device][direction], *args, **kwargs)
     return func_wrapper
 
+def apply_to_dict(func, dfs, *args, **kwargs):
+    new = construct_dict_2_layers(dfs)
+    for device in dfs:
+        for direction in dfs[device]:
+            new[device][direction] = func(dfs[device][direction], *args, **kwargs)
 
+    if new[device][direction] is not None:
+        return new
+
+def apply_to_2dicts(func, dict1, dict2, *args, **kwargs):
+    new = construct_dict_2_layers(dict1)
+    for device in dict1:
+        for direction in dict1[device]:
+            new[device][direction] = func(dict1[device][direction], dict2[device][direction], *args, **kwargs)
+
+    if new[device][direction] is not None:
+        return new
+        
 @access_traffic_df
 def print_frame(frame):
     print(frame.head())

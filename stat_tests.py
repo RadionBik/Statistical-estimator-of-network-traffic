@@ -3,6 +3,13 @@ from plot_helpers import getXAxisValues
 import scipy
 import pandas as pd
 
+def get_KL_divergence_value(orig_values, gen_values, x_values):
+
+    kde_orig = scipy.stats.gaussian_kde(orig_values)
+    kde_gen = scipy.stats.gaussian_kde(gen_values)
+    return scipy.stats.entropy(pd.Series(kde_orig(x_values)), pd.Series(kde_gen(x_values)))
+
+
 def get_KL_divergence(orig_dfs, gen_dfs):
     '''
     calculates Kulback-Leibler divergence to describe similarity between distributions of 
@@ -21,11 +28,8 @@ def get_KL_divergence(orig_dfs, gen_dfs):
             orig_values = orig_dfs[device][direction][parameter].iloc[:min_len]
             gen_values = gen_dfs[device][direction][parameter].iloc[:min_len]
             x_values = getXAxisValues(parameter, traffic=orig_values)
+            distance = get_KL_divergence_value(orig_values, gen_values, x_values)
 
-            kde_orig = scipy.stats.gaussian_kde(orig_values)
-            kde_gen = scipy.stats.gaussian_kde(gen_values)
-
-            distance = scipy.stats.entropy(pd.Series(kde_orig(x_values)), pd.Series(kde_gen(x_values)))
             KL_distances[device][direction].update({parameter : distance})
             print('{:4s}, {:7s}\t{:0.4f}'.format(direction,parameter, distance))
         
