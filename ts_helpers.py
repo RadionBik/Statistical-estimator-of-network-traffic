@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import entropy
+import random
 
 from traffic_helpers import *
 
@@ -129,10 +130,10 @@ def change_pmf_temperature(preds, temperature=1.0):
     return np.argmax(probas)
 
 
-def rnn_gener_state(sample_number_to_gener, state_init, window_size, temperature=1.0):
-    start_index = random.randint(0, len(state_init) - window_size - 1)
+def rnn_gener_state(sample_number_to_gener, init_states, window_size, temperature=1.0):
+    start_index = random.randint(0, len(init_states) - window_size - 1)
 
-    seed_states = state_init[start_index: start_index + window_size]
+    seed_states = init_states[start_index: start_index + window_size]
     generated_states = np.zeros(sample_number_to_gener)
     generated_states[:window_size] = seed_states
     print('------ temperature:', temperature)
@@ -151,14 +152,17 @@ def rnn_gener_state(sample_number_to_gener, state_init, window_size, temperature
     return generated_states
 
 
-def gener_rnn_states_with_best_temperature(sample_number_to_gener, gmm_states,
+def gener_rnn_states_with_best_temperature(sample_number_to_gener, init_from_states,
                                            window_size):
     least_distance = 1
     for temperature in [1.2, 1.5, 1.8, 2.0]:
-        rnn_states = rnn_gener_state(
-            sample_number_to_gener, gmm_states, window_size, temperature)
-        min_len = min(len(rnn_states), len(gmm_states))
-        distance = get_KL_divergence_value(gmm_states[:min_len],
+        rnn_states = rnn_gener_state(sample_number_to_gener,
+                                     init_from_states,
+                                     window_size,
+                                     temperature)
+
+        min_len = min(len(rnn_states), len(init_from_states))
+        distance = get_KL_divergence_value(init_from_states[:min_len],
                                            rnn_states[:min_len],
                                            np.linspace(0, state_numb, 100))
         print(distance)
