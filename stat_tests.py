@@ -1,9 +1,19 @@
 from traffic_helpers import *
-from plot_helpers import getXAxisValues
 import scipy
 import pandas as pd
+import numpy as np
 
-def get_KL_divergence_value(orig_values, gen_values, x_values):
+def get_KL_divergence_pmf(orig_values, gen_values, state_numb=None):
+
+    if not state_numb:
+        state_numb = len( set(orig_values) & set(gen_values) )
+
+    pmf_orig = [len(orig_values[orig_values==state]) for state in range(state_numb)]
+    pmf_gen = [len(gen_values[gen_values==state]) for state in range(state_numb)]
+    
+    return scipy.stats.entropy(pmf_orig, pmf_gen)
+
+def get_KL_divergence_pdf(orig_values, gen_values, x_values):
 
     kde_orig = scipy.stats.gaussian_kde(orig_values)
     kde_gen = scipy.stats.gaussian_kde(gen_values)
@@ -16,7 +26,6 @@ def get_KL_divergence(orig_dfs, gen_dfs):
     original and generated PktLens and IATs.
     '''
 
-    print('Kulback-Leibler divergence:')
     KL_distances = construct_dict_2_layers(orig_dfs)
     for device, direction, distance in iterate_traffic_dict(KL_distances):
         min_len = min(len(orig_dfs[device][direction]), len(gen_dfs[device][direction]))
@@ -27,12 +36,15 @@ def get_KL_divergence(orig_dfs, gen_dfs):
 
             orig_values = orig_dfs[device][direction][parameter].iloc[:min_len]
             gen_values = gen_dfs[device][direction][parameter].iloc[:min_len]
-            x_values = getXAxisValues(parameter, traffic=orig_values)
-            distance = get_KL_divergence_value(orig_values, gen_values, x_values)
+            x_values = np.linspace(0, max(orig_values), 100)
+            distance = get_KL_divergence_pdf(orig_values, gen_values, x_values)
 
             KL_distances[device][direction].update({parameter : distance})
-            print('{:4s}, {:7s}\t{:0.4f}'.format(direction,parameter, distance))
         
+    print('Kulback-Leibler divergence:')
+    for device in KL_distances:
+        print(device)
+        print(pd.DataFrame(KL_distances[device]))
     return KL_distances
 
 def get_ks_2sample_test(orig_dfs, gen_dfs):
@@ -47,7 +59,6 @@ def get_ks_2sample_test(orig_dfs, gen_dfs):
     that the distributions of the two samples are the same.
 
     '''
-    print('Kolmogorov-Smirnov 2-sample test:')
     ks_2s = construct_dict_2_layers(orig_dfs)
     for device, direction, distance in iterate_traffic_dict(ks_2s):
         min_len = min(len(orig_dfs[device][direction]), len(gen_dfs[device][direction]))
@@ -61,9 +72,15 @@ def get_ks_2sample_test(orig_dfs, gen_dfs):
             ks_2s[device][direction][parameter] = {}
             ks = scipy.stats.ks_2samp(orig_values, gen_values)
             ks_df = pd.DataFrame([[ks.statistic, ks.pvalue]], columns=['statistic','p-value'], index=[direction+' ,'+parameter])
-            print('{}'.format(ks_df))
+            #rint('{}'.format(ks_df))
             ks_2s[device][direction][parameter].update({'p-value': ks.pvalue, 
                                                         'statistic': ks.statistic})
+    
+    print('Kolmogorov-Smirnov 2-sample test:')
+    for device, direction, ks in iterate_traffic_dict(ks_2s):
+        print(direction, device)
+        print(pd.DataFrame(ks))
+        
     return ks_2s
 
 def get_percentiles_dfs(dfs, percentile_chunks=40):

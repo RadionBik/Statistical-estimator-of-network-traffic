@@ -2,6 +2,10 @@ figures/
 log/
 jupyter_notebooks/
 #traffic_dumps/*
+.idea/
+.directory
+
+venv
 
 temp_py/
 #stat_figures/
@@ -17,12 +21,14 @@ estimator_libs/
 *.sh
 *.pcap
 *.svg
+*.pdf
+stat_figures
 deviceStat.ipynb
 rnn_test.ipynb
 #stat_figures/*.svg
 test_*
 ndpiReader
-ndpi_arch
+bin/ndpi_arch
 extractPacketStats.py
 compare_pcaps.py
 

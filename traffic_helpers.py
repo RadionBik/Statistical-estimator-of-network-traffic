@@ -1,17 +1,15 @@
-
-import pdb
-import os
-import numpy as np
-from collections import defaultdict
-import socket
 import pickle
-import dpkt
-from dpkt.compat import compat_ord
 import re
-import sklearn.neighbors
-import sklearn
+import socket
+import functools
+
+from collections import defaultdict
+import numpy as np
 import pandas as pd
+from dpkt.compat import compat_ord
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+import cProfile
+
 
 def get_df_from_traffic(traffic):
     traffic_df = defaultdict(dict)
@@ -20,49 +18,72 @@ def get_df_from_traffic(traffic):
             traffic_df[device][direction] = pd.DataFrame()
             timestamps = pd.Series(traffic[device][direction]['ts'])
             traffic_df[device][direction]['IAT'] = timestamps.diff().fillna(value=0)
-            
-            traffic_df[device][direction]['pktLen'] = pd.Series(traffic[device][direction]['pktLen']) 
 
-            traffic_df[device][direction].index = pd.to_datetime(timestamps, unit='s') - pd.to_datetime(timestamps[0], unit='s')
+            traffic_df[device][direction]['pktLen'] = pd.Series(traffic[device][direction]['pktLen'])
 
-            #traffic_df[device][direction]['window_pkt'] = traffic_df[device][direction]['pktLen'].rolling('1S').sum()
-            
+            traffic_df[device][direction].index = pd.to_datetime(timestamps, unit='s') - pd.to_datetime(timestamps[0],
+                                                                                                        unit='s')
+
+            # traffic_df[device][direction]['window_pkt'] = traffic_df[device][direction]['pktLen'].rolling('1S').sum()
+
     return traffic_df
 
-def access_traffic_df(func):
-    def func_wrapper(traffic, *args, **kwargs):
-        for device in traffic:
-            for direction in traffic[device]:
-                func(traffic[device][direction], *args, **kwargs)
-    return func_wrapper
 
-def apply_to_dict(func, dfs, *args, **kwargs):
-    new = construct_dict_2_layers(dfs)
-    for device in dfs:
-        for direction in dfs[device]:
-            new[device][direction] = func(dfs[device][direction], *args, **kwargs)
+def _unpack_2layer_args(args, device, direction):
+    unpacked_args = []
+    for arg in args:
+        if isinstance(arg, dict) and device in arg and direction in arg[device]:
+            arg = arg[device][direction]
+        unpacked_args.append(arg)
+    return unpacked_args
 
-    if new[device][direction] is not None:
-        return new
 
-def apply_to_2dicts(func, dict1, dict2, *args, **kwargs):
-    new = construct_dict_2_layers(dict1)
-    for device in dict1:
-        for direction in dict1[device]:
-            new[device][direction] = func(dict1[device][direction], dict2[device][direction], *args, **kwargs)
+def unpack_2layer_traffic_dict(func):
+    @functools.wraps(func)
+    def wrapper(traffic_dict: dict, *args, **kwargs):
+        new_dfs1 = defaultdict(dict)
+        new_dfs2 = defaultdict(dict)
+        two_results = False
+        for device, dev_df in traffic_dict.items():
+            for direction, direct_df in dev_df.items():
+                unpacked_args = _unpack_2layer_args(args, device, direction)
+                result = func(direct_df, *unpacked_args, **kwargs)
+                if result is not None:
+                    new_dfs1[device][direction] = result
+                if isinstance(result, tuple) and len(result) == 2:
+                    two_results = True
+                    new_dfs1[device][direction] = result[0]
+                    new_dfs2[device][direction] = result[1]
+        if two_results:
+            return new_dfs1, new_dfs2
+        else:
+            return new_dfs1
 
-    if new[device][direction] is not None:
-        return new
-        
-@access_traffic_df
-def print_frame(frame):
-    print(frame.head())
+    return wrapper
+
+
+def unpack_3layer_traffic_dict(func):
+    @functools.wraps(func)
+    def wrapper(traffic_df: dict, *args, **kwargs):
+        new_dfs = defaultdict(dict)
+        for device, dev_df in traffic_df.items():
+            new_dfs[device] = defaultdict(dict)
+            for direction, direct_df in dev_df.items():
+                for parameter, param_df in direct_df.items():
+                    result = func(param_df, *args, **kwargs)
+                    if result is not None:
+                        new_dfs[device][direction][parameter] = result
+        return new_dfs
+
+    return wrapper
+
 
 def iterate_traffic_dict(traff_dict):
     for device in traff_dict:
         for direction in traff_dict[device]:
             dat = traff_dict[device][direction]
             yield device, direction, dat
+
 
 def iterate_traffic_3_layers(traff_dict):
     for device in traff_dict:
@@ -78,6 +99,7 @@ def iterate_dfs(traffic):
             df = traffic[device][direction].copy()
             yield df
 
+
 def iterate_dfs_plus(traffic):
     for device in traffic:
         for direction in traffic[device]:
@@ -87,12 +109,14 @@ def iterate_dfs_plus(traffic):
 
 def profile(func):
     """Decorator for run function profile"""
+
     def wrapper(*args, **kwargs):
         profile_filename = func.__name__ + '.prof'
         profiler = cProfile.Profile()
         result = profiler.runcall(func, *args, **kwargs)
         profiler.dump_stats(profile_filename)
         return result
+
     return wrapper
 
 
@@ -101,14 +125,13 @@ def find_max_parameters(traffic_dfs):
 
     for device in traffic_dfs:
         for parameter in ['pktLen', 'IAT']:
-            max_params[parameter] = max([max(traffic_dfs[device]['from'][parameter]), max(traffic_dfs[device]['to'][parameter])])
+            max_params[parameter] = max(
+                [max(traffic_dfs[device]['from'][parameter]), max(traffic_dfs[device]['to'][parameter])])
 
     return max_params
 
 
-
 def find_max_iat(device_traffic):
-
     # find the max IAT among all directions
     maxParam = {}
     for device in device_traffic:
@@ -124,12 +147,11 @@ def find_max_iat(device_traffic):
     return maxParam
 
 
-
 def mod_addr(mac):
     '''
     replaces : and . with _ for addresses to enable saving to a disk
     '''
-    return mac.replace(':', '_').replace('.', '_').replace(' ','_')
+    return mac.replace(':', '_').replace('.', '_').replace(' ', '_')
 
 
 def ip_to_string(inet):
@@ -162,14 +184,16 @@ def is_ip_addr(string):
 
 
 def is_ip_port(string):
-    if re.match("6553[0-6]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|0?[1-9][0-9]{3}|0?0?[1-9][0-9]{2}|0?0?0?[1-9][0-9]|0{0,4}[1-9]", string):
+    if re.match(
+            "6553[0-6]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|0?[1-9][0-9]{3}|0?0?[1-9][0-9]{"
+            "2}|0?0?0?[1-9][0-9]|0{0,4}[1-9]",
+            string):
         return True
     else:
         return False
 
 
 def get_5_tuple_fields(string):
-
     try:
         tupleDict = {'proto': string.split(' ')[0],
                      'ip_s': string.split(' ')[1].split(':')[0],
@@ -184,10 +208,10 @@ def get_5_tuple_fields(string):
 
 
 def is_5_tuple(string):
-
     tup = get_5_tuple_fields(string)
 
-    if re.match("udp|tcp", tup['proto'].lower()) and is_ip_port(tup['port_s']) and is_ip_port(tup['port_d']) and is_ip_addr(tup['ip_s']) and is_ip_addr(tup['ip_d']):
+    if re.match("udp|tcp", tup['proto'].lower()) and is_ip_port(tup['port_s']) and is_ip_port(
+            tup['port_d']) and is_ip_addr(tup['ip_s']) and is_ip_addr(tup['ip_d']):
         return True
     else:
         return False
@@ -203,6 +227,7 @@ def mac_addr(address):
     """
     return ':'.join('%02x' % compat_ord(b) for b in address)
 
+
 def construct_dict_2_layers(ref_dict):
     new_dict = defaultdict(dict)
     for device in ref_dict:
@@ -210,6 +235,7 @@ def construct_dict_2_layers(ref_dict):
             new_dict[device][direction] = None
 
     return new_dict
+
 
 def construct_new_dict(ref_dict):
     new_dict = {}
@@ -221,17 +247,19 @@ def construct_new_dict(ref_dict):
 
     return new_dict
 
+
 def construct_new_dict_no_ts(ref_dict):
     new_dict = {}
     for device in ref_dict:
         new_dict[device] = defaultdict(dict)
         for direction in ref_dict[device]:
             for parameter in ref_dict[device][direction]:
-                if parameter=='ts':
+                if parameter == 'ts':
                     continue
                 new_dict[device][direction][parameter] = None
 
     return new_dict
+
 
 def get_IAT(TS):
     '''
@@ -262,7 +290,7 @@ def load_obj(name):
     '''
     load_obj() loads python object from the file inside 'obj' directory
     '''
-    with open('obj/'+name+'.pkl', 'rb') as f:
+    with open('obj/' + name + '.pkl', 'rb') as f:
         return pickle.load(f)
 
 
@@ -273,19 +301,18 @@ def getAddressList(file, typeIdent):
     '''
 
     addressList = []
-    if file != 'all' or typeIdent != 'flow':
+    if file != 'all' and typeIdent != 'flow':
         with open(file, 'r') as f:
-            print('Reading identifiers from the file...')
+            print('Reading identifiers from the {} file...'.format(file))
             for line in f:
                 if line[0] == '#':
                     continue
-                #print(line, end='')
+                # print(line, end='')
                 addressList.append(line.rstrip())
     return addressList
 
 
 def get_data_below_percentile(device_traffic, percentile):
-
     new_traffic = []
     for entry in device_traffic:
         if entry > np.percentile(device_traffic, percentile):
@@ -296,7 +323,6 @@ def get_data_below_percentile(device_traffic, percentile):
 
 
 def get_data_within_percentiles(device_traffic, percentiles):
-
     new_traffic = []
     upper_bound = np.percentile(device_traffic, percentiles[1])
     lower_bound = np.percentile(device_traffic, percentiles[0])
@@ -307,6 +333,7 @@ def get_data_within_percentiles(device_traffic, percentiles):
         new_traffic.append(entry)
 
     return new_traffic
+
 
 def getTrafficExtremeValues(traffic):
     '''
@@ -338,7 +365,7 @@ def getTrafficExtremeValues(traffic):
 
 
 def get_pcap_filename(args):
-    return args.p.split('/')[len(args.p.split('/'))-1].split('.')[0]
+    return args.p.split('/')[len(args.p.split('/')) - 1].split('.')[0]
 
 
 def print_parameters(header, dictWithDevices):
@@ -357,36 +384,29 @@ def print_parameters(header, dictWithDevices):
     # print('\n')
 
 
-
 def convert_arrays_to_dfs(samples):
     gener_dfs = construct_dict_2_layers(samples)
-    for device, direction, df in iterate_traffic_dict(samples): 
-        gener_dfs[device][direction]= pd.DataFrame(df, columns=['pktLen', 'IAT'])
-    
+    for device, direction, df in iterate_traffic_dict(samples):
+        gener_dfs[device][direction] = pd.DataFrame(df, columns=['pktLen', 'IAT'])
+
     return gener_dfs
 
-def normalize_dfs(traffic_dfs, parameters=None, std_scaler=True):
-    norm_traffic = construct_dict_2_layers(traffic_dfs)
-    scalers = construct_dict_2_layers(traffic_dfs)
-    for device, direction, df in iterate_dfs_plus(traffic_dfs):
-        if std_scaler:
-            scaler = StandardScaler()
-        else:
-            scaler = MinMaxScaler()
-        
-        #try:
-        #    df.drop('ts', axis=1, inplace=True)
-        #except KeyError:
-        #    print('No "ts" found! Check DataFrame structure in normalize_dfs()')
-       
-        if parameters:
-            df=df[parameters]
 
-        if 'pktLen' in df.columns:
-            df['pktLen'] = df['pktLen'].astype(float, copy=False)
+@unpack_2layer_traffic_dict
+def normalize_dfs(df, parameters=None, std_scaler=True):
+    if std_scaler:
+        scaler = StandardScaler()
+    else:
+        scaler = MinMaxScaler()
 
-        scalers[device][direction] = scaler.fit(df)
-        norm_traffic[device][direction] = pd.DataFrame(scalers[device][direction].transform(df),
-                                                        columns=df.columns)
+    if parameters:
+        df = df[parameters]
 
-    return norm_traffic, scalers
+    if 'pktLen' in df.columns:
+        df['pktLen'] = df['pktLen'].astype(float, copy=False)
+
+    scaler.fit(df)
+    norm_traffic = pd.DataFrame(scaler.transform(df),
+                                columns=df.columns)
+
+    return norm_traffic, scaler

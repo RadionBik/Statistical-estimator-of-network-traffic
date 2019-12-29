@@ -36,7 +36,7 @@ def modifyTrafficDict(traffic):
 
 def get_voip_flow_list(pcapfile):
     
-    pipe = Popen(["./ndpi_arch", "-i", pcapfile, "-v2"], stdout=PIPE)
+    pipe = Popen(["./bin/ndpi_arch", "-i", pcapfile, "-v2"], stdout=PIPE)
     raw = pipe.communicate()[0].decode("utf-8")
 
     reg = re.compile(
@@ -194,7 +194,12 @@ def checkIdentifiersType(identifiers):
     #print(identifiersType)
     return identifiersType
 
-def extractHostStatsDpkt(pcapfile, hosts=[], setIdentifier='IP', payloadOnly=True, min_samples_to_estimate=15):
+def extract_host_stats(pcapfile, 
+                        hosts=None, 
+                        setIdentifier='IP', 
+                        payloadOnly=True, 
+                        min_samples_to_estimate=15,
+                        max_packet_limit = 20000):
     '''
     extractHostsFromPcapDpkt() uses the dpkt lib to extract packet features of the 
     desired hosts.
@@ -210,51 +215,63 @@ def extractHostStatsDpkt(pcapfile, hosts=[], setIdentifier='IP', payloadOnly=Tru
     traffic = {}
     if type(hosts) is str:
         hosts = [hosts]
-    for identifier in hosts:
-            traffic[identifier] = {'from': {'ts': [],'pktLen': [],'IAT': []}, 
-                                     'to': {'ts': [],'pktLen': [],'IAT': []}}
     
 
     identifiersType = checkIdentifiersType(hosts)
+    hosts_with_valid_identifiers = []
+    for identifier in hosts:
 
-    #TODO ineffective implementation, make it to iterate once to fill the traffic
-    for host in hosts:
-        
-        identifierType = identifiersType[host]
-
-        if identifierType != setIdentifier:
+        if identifiersType[identifier] != setIdentifier:
             continue
-   
-        for ts, raw in dpkt.pcap.Reader(open(pcapfile, "rb")):
-            eth = dpkt.ethernet.Ethernet(raw)
-            ip = eth.data
 
-            #skip ARP, ICMP, etc.
-            if not isinstance(ip, dpkt.ip.IP):
-                continue
-            #filter out segments and datagrams without payload (e.g. SYN, SYN/ACK, etc.)
-            if payloadOnly and len(ip.data.data) == 0:
-                continue
+        hosts_with_valid_identifiers.append(identifier)
+        traffic[identifier] = {'from': {'ts': [],'pktLen': [],'IAT': []}, 
+                                     'to': {'ts': [],'pktLen': [],'IAT': []}}
+    
 
-            if identifierType == 'MAC':
-                identifierFrom = mac_addr(eth.src)
-                identifierTo = mac_addr(eth.dst)
-            else:
-                identifierFrom = ip_to_string(eth.data.src)
-                identifierTo = ip_to_string(eth.data.dst)
+    print(hosts_with_valid_identifiers)
 
-            if identifierFrom == host:
-                direction = 'from'
-            elif identifierTo == host:
-                direction = 'to'
-            else:
-                continue
+    packet_counter = 1
+    for ts, raw in dpkt.pcap.Reader(open(pcapfile, "rb")):
+        if packet_counter%100000==0:
+            print('Processed {} packets...'.format(packet_counter))
+        eth = dpkt.ethernet.Ethernet(raw)
+        ip = eth.data
+        packet_counter+=1
 
-            traffic[identifierTo]['to']['ts'].append(ts)
-            if payloadOnly:
-                traffic[identifierTo]['to']['pktLen'].append(len(ip.data.data))
-            else:
-                traffic[identifierTo]['to']['pktLen'].append(len(ip))
+
+        #skip ARP, ICMP, etc.
+        if not isinstance(ip, dpkt.ip.IP):
+            continue
+        #filter out segments and datagrams without payload (e.g. SYN, SYN/ACK, etc.)
+        if payloadOnly and len(ip.data.data) == 0:
+            continue
+
+        if setIdentifier == 'MAC':
+            identifierFrom = mac_addr(eth.src)
+            identifierTo = mac_addr(eth.dst)
+        elif setIdentifier == 'IP':
+            identifierFrom = ip_to_string(eth.data.src)
+            identifierTo = ip_to_string(eth.data.dst)
+
+        if identifierFrom in hosts_with_valid_identifiers:
+            identifier = identifierFrom
+            direction = 'from'
+        elif identifierTo in hosts_with_valid_identifiers:
+            identifier = identifierTo
+            direction = 'to'
+        else:
+            continue
+
+        if len(traffic[identifier]['from']['ts'])+len(traffic[identifier]['to']['ts']) > max_packet_limit:
+            continue
+
+        traffic[identifier][direction]['ts'].append(ts)
+        if payloadOnly:
+            traffic[identifier][direction]['pktLen'].append(len(ip.data.data))
+        else:
+            traffic[identifier][direction]['pktLen'].append(len(ip))
+
 
     emptyIdentifiers = set()
     for identifier in traffic:
@@ -420,13 +437,14 @@ def craft_traffic_features(traffic):
         
     return orig_dfs 
 
-def getTrafficFeatures(pcapfile, fileIdent, typeIdent, percentiles=None, min_samples_to_estimate=None):
+def getTrafficFeatures(pcapfile, typeIdent, fileIdent='addresses_to_check.txt', percentiles=None, min_samples_to_estimate=None):
+    print(fileIdent)
     identifiers = getAddressList(fileIdent, typeIdent)
 
     if typeIdent=='flow':
         extractedTraffic = extract_flow_stats(pcapfile, identifiers, min_samples_to_estimate)
     elif typeIdent=='MAC' or typeIdent=='IP':
-        extractedTraffic = extractHostStatsDpkt(pcapfile, identifiers, typeIdent, min_samples_to_estimate)
+        extractedTraffic = extract_host_stats(pcapfile, identifiers, typeIdent, min_samples_to_estimate)
     else:
         exit('wrong identifier type. See help')
 
