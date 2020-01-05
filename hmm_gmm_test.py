@@ -26,6 +26,7 @@
 
 import sys
 # sys.path.append("..")
+import traffic_helpers
 from plotting import plot_stat_properties, goodput_dfs, hist_dfs, hist_2d_dfs
 import stat_estimator as estimator
 import hmm_helpers as hmm_h
@@ -36,9 +37,8 @@ import matplotlib.pyplot as plt
 plt.rcParams['figure.figsize'] = [10, 5]
 
 pcapfile = 'traffic_dumps/skypeLANhome.pcap'
-traffic_dfs = estimator.getTrafficFeatures(pcapfile, 
-                                           typeIdent='flow',
-                                           fileIdent='all',
+traffic_dfs = estimator.getTrafficFeatures(pcapfile,
+                                           type_of_identifier=traffic_helpers.TrafficObjects.FLOW,
                                            percentiles=(3,97),
                                            min_samples_to_estimate=100)[0]
 norm_traffic, scalers = preprocessors.normalize_dfs(traffic_dfs)

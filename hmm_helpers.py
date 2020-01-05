@@ -31,7 +31,7 @@ def print_gmm(models, componentWeightThreshold=0.02):
 
 def get_hmm_gaussian_models(traffic_dfs, n_comp=3, parameters=None):
     models = construct_dict_2_layers(traffic_dfs)
-    for device, direction, df in iterate_dfs_plus(traffic_dfs):
+    for device, direction, df in iterate_2layer_dict_copy(traffic_dfs):
         model = hmm.GaussianHMM(n_components=n_comp, covariance_type="full", n_iter=100, tol=0.001)
         print(f'Started fitting {device} in direction "{direction}"')
         if parameters:
@@ -42,7 +42,7 @@ def get_hmm_gaussian_models(traffic_dfs, n_comp=3, parameters=None):
 
 def get_gmm(traffic_dfs, n_comp=None, parameters=None, w_conc_prior=0.01, w_conc_type='dirichlet_distribution'):
     models = construct_dict_2_layers(traffic_dfs)
-    for device, direction, df in iterate_dfs_plus(traffic_dfs):
+    for device, direction, df in iterate_2layer_dict_copy(traffic_dfs):
         lowest_bic = np.infty
         bic = []
         if not n_comp:
@@ -77,7 +77,7 @@ def get_gmm(traffic_dfs, n_comp=None, parameters=None, w_conc_prior=0.01, w_conc
 
 def get_hmm_gmm(traffic_dfs, n_comp=3, n_mixture=3, parameters=None):
     models = construct_dict_2_layers(traffic_dfs)
-    for device, direction, df in iterate_dfs_plus(traffic_dfs):
+    for device, direction, df in iterate_2layer_dict_copy(traffic_dfs):
         model = hmm.GMMHMM(n_components=n_comp, n_mix=n_mixture, covariance_type="full", n_iter=200, tol=0.001)
         print(f'Started fitting {device} in direction "{direction}"')
         if parameters:
@@ -88,7 +88,7 @@ def get_hmm_gmm(traffic_dfs, n_comp=3, n_mixture=3, parameters=None):
 
 def get_kmeans(traffic_dfs, n_comp=3):
     clusters = construct_dict_2_layers(traffic_dfs)
-    for device, direction, df in iterate_dfs_plus(traffic_dfs):
+    for device, direction, df in iterate_2layer_dict_copy(traffic_dfs):
         clusters[device][direction] = KMeans(n_clusters=n_comp).fit_predict(df)
         # print(clusters[device][direction])
     return clusters
@@ -96,7 +96,7 @@ def get_kmeans(traffic_dfs, n_comp=3):
 
 def gener_hmm_states(models, orig_dfs=None):
     states = construct_dict_2_layers(models)
-    for device, direction, df in iterate_traffic_dict(models):
+    for device, direction, df in iterate_2layer_dict(models):
         if isinstance(orig_dfs, int):
             sample_numb = orig_dfs
         elif isinstance(orig_dfs, dict):
@@ -115,7 +115,7 @@ def gener_samples(models, scalers=None, sample_numb=500, truncate_negative=True,
     '''
     samples = construct_dict_2_layers(models)
     states = construct_dict_2_layers(models)
-    for device, direction, df in iterate_traffic_dict(models):
+    for device, direction, df in iterate_2layer_dict(models):
         model = models[device][direction]
         scaler = scalers[device][direction]
 
@@ -148,7 +148,7 @@ def gener_samples(models, scalers=None, sample_numb=500, truncate_negative=True,
 
 def generate_features_from_gmm_states(gmm_models, states_dict, scalers=None):
     gener_df = construct_dict_2_layers(gmm_models)
-    for device, direction, gmm in iterate_traffic_dict(gmm_models):
+    for device, direction, gmm in iterate_2layer_dict(gmm_models):
         states = states_dict[device][direction]
         if scalers:
             scaler = scalers[device][direction]

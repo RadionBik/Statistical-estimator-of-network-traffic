@@ -23,7 +23,7 @@ import sys
 from stat_estimator import *
 from traffic_helpers import *
 from plot_helpers import *
-from ts_helpers import *
+from timeseries import *
 from hmm_helpers import *
 from stat_tests import *
 from rnn_helpers import *
@@ -36,7 +36,7 @@ plt.rcParams['figure.figsize'] = [12, 5]
 pcapfile = '/home/radion/Applications/iot_amazon_echo.pcap'
 traffic_dfs = getTrafficFeatures(pcapfile,
                                  #fileIdent='all'
-                                 typeIdent='MAC',
+                                 type_of_identifier='MAC',
                                  percentiles=(1,99),
                                  min_samples_to_estimate=100)[0]
 

@@ -27,7 +27,7 @@ def get_KL_divergence(orig_dfs, gen_dfs):
     '''
 
     KL_distances = construct_dict_2_layers(orig_dfs)
-    for device, direction, distance in iterate_traffic_dict(KL_distances):
+    for device, direction, distance in iterate_2layer_dict(KL_distances):
         min_len = min(len(orig_dfs[device][direction]), len(gen_dfs[device][direction]))
         KL_distances[device][direction] = {}
         
@@ -60,7 +60,7 @@ def get_ks_2sample_test(orig_dfs, gen_dfs):
 
     '''
     ks_2s = construct_dict_2_layers(orig_dfs)
-    for device, direction, distance in iterate_traffic_dict(ks_2s):
+    for device, direction, distance in iterate_2layer_dict(ks_2s):
         min_len = min(len(orig_dfs[device][direction]), len(gen_dfs[device][direction]))
         ks_2s[device][direction] = {}
         
@@ -77,7 +77,7 @@ def get_ks_2sample_test(orig_dfs, gen_dfs):
                                                         'statistic': ks.statistic})
     
     print('Kolmogorov-Smirnov 2-sample test:')
-    for device, direction, ks in iterate_traffic_dict(ks_2s):
+    for device, direction, ks in iterate_2layer_dict(ks_2s):
         print(direction, device)
         print(pd.DataFrame(ks))
         
@@ -90,7 +90,7 @@ def get_percentiles_dfs(dfs, percentile_chunks=40):
 
     '''
     qq = construct_dict_2_layers(dfs)
-    for device, direction, df in iterate_traffic_dict(dfs):
+    for device, direction, df in iterate_2layer_dict(dfs):
         qq[device][direction] = df.describe(percentiles=[x/percentile_chunks for x in range(percentile_chunks)]).iloc[4:4+percentile_chunks,:]
     return qq
 
@@ -109,7 +109,7 @@ def get_qq_r_comparison(orig_dfs, gener_dfs):
     qq_orig = get_percentiles_dfs(orig_dfs)
     qq_gen = get_percentiles_dfs(gener_dfs)
 
-    for device, direction, df in iterate_dfs_plus(qq_orig):
+    for device, direction, df in iterate_2layer_dict_copy(qq_orig):
         r_value[device][direction] = df.corrwith(qq_gen[device][direction])
         print('{}:\n{}'.format(direction, r_value[device][direction]))
 

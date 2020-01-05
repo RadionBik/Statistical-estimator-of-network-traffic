@@ -68,7 +68,7 @@ def ts_acfs_dfs(dfs, lags=200, saveToFile=None, style='bmh'):
     with plt.style.context(style):
         fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12, 5))
         plot_counter = 0
-        for device, direction, y in preproc.iterate_traffic_dict(dfs):
+        for device, direction, y in preproc.iterate_2layer_dict(dfs):
             smt.graphics.plot_acf(y, lags=lags, ax=axes[plot_counter, 0], title='ACF | {}'.format(direction))
             smt.graphics.plot_pacf(y, lags=lags, ax=axes[plot_counter, 1], title='Partial ACF | {}'.format(direction))
             plot_counter += 1

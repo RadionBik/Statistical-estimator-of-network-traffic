@@ -27,7 +27,7 @@ deviceStat.ipynb
 rnn_test.ipynb
 #stat_figures/*.svg
 test_*
-ndpiReader
+bin/ndpi_deb
 bin/ndpi_arch
 extractPacketStats.py
 compare_pcaps.py

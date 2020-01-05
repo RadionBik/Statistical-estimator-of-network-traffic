@@ -1,6 +1,6 @@
-#from traffic_helpers import *
+# from traffic_helpers import *
 from gmm_helpers import *
-from ts_helpers import *
+from timeseries import *
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -18,7 +18,7 @@ def plot_stat_properties(traffic_dfs, saveToFile=None):
     for PktLen and IAT
     '''
 
-    for device, direction, df in iterate_traffic_dict(traffic_dfs):
+    for device, direction, df in iterate_2layer_dict(traffic_dfs):
         fig, axes = plt.subplots(nrows=2, ncols=2)
         fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.4, hspace=0.4)
         fig.suptitle('{} {}'.format(direction, device))
@@ -40,7 +40,7 @@ def plot_stat_properties(traffic_dfs, saveToFile=None):
 
 def print_stat_properties(traffic_dfs, model='HMM'):
     print('----------------\nModel {}:'.format(model))
-    for device, direction, df in iterate_traffic_dict(traffic_dfs):
+    for device, direction, df in iterate_2layer_dict(traffic_dfs):
         print('{} {}:\n {}\n'.format(direction, device, df.describe().loc[['mean', 'std', '50%'], :]))
 
 
@@ -358,10 +358,10 @@ def plot_acf_df(df, lags=None):
         plt.show()
 
 
-def plot_dfs_acf(dfs, lags=500, saveToFile=None):
+def features_acf_dfs(dfs, lags=500, saveToFile=None):
     fig, ax = plt.subplots(nrows=4, ncols=2, figsize=[14, 7])
     plot_counter = 0
-    for device, direction, df in iterate_dfs_plus(dfs):
+    for device, direction, df in iterate_2layer_dict_copy(dfs):
         df.index = [i for i in range(df.shape[0])]
         df['pktLen'].plot(ax=ax[plot_counter, 0], grid=1)
         ax[plot_counter, 0].yaxis.set_label_text('PS, bytes')
@@ -408,7 +408,7 @@ def goodput(df, resolution='1S', plot=True, saveToFile=None):
 def goodput_dfs(dfs, resolution='1S', saveToFile=None):
     fig, ax = plt.subplots(nrows=1, ncols=2, figsize=[12, 5])
     plot_counter = 0
-    for device, direction, df in iterate_dfs_plus(dfs):
+    for device, direction, df in iterate_2layer_dict_copy(dfs):
         # replace indexes with DateTime format
         df.index = pd.to_datetime(df.IAT.cumsum(), unit='s')
         goodput_df = df.resample(resolution).sum()
@@ -436,7 +436,7 @@ def entropies_dfs(traffic_dfs,
     legends = []
     params = []
     plt.figure()
-    for device, direction, parameter, ser in iterate_traffic_3_layers(traffic_dfs):
+    for device, direction, parameter, ser in iterate_3layer_dict(traffic_dfs):
         entropy = calc_windowed_entropy_cont(traffic_dfs[device][direction][parameter], kde_bins=kde_bins,
                                              window=window)
         mean_entropy = np.mean(entropy)
@@ -472,7 +472,7 @@ def hist_3d(dfs, save_to=None):
 
     fig = plt.figure(figsize=(14, 7))
     plot_idx = 1
-    for device, direction, df in iterate_traffic_dict(dfs):
+    for device, direction, df in iterate_2layer_dict(dfs):
         ax = fig.add_subplot(1, 2, plot_idx, projection='3d')
         # Make data.
         hist, xedges, yedges = np.histogram2d(df['IAT'], df['pktLen'], bins=40, normed=0)
@@ -504,7 +504,7 @@ def hist_joint_dfs(dfs, save_to=None):
     # fig.subplots_adjust(wspace=0.5)
 
     fig_shifter = 0
-    for device, direction, df in iterate_dfs_plus(dfs):
+    for device, direction, df in iterate_2layer_dict_copy(dfs):
 
         # df = df.copy()
         df.index = [i for i in range(df.shape[0])]

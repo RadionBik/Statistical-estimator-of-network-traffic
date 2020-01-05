@@ -4,11 +4,18 @@ import socket
 import functools
 
 from collections import defaultdict
+from enum import Enum, auto
+
 import numpy as np
 import pandas as pd
 from dpkt.compat import compat_ord
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import cProfile
+import logging
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def get_df_from_traffic(traffic):
@@ -39,6 +46,14 @@ def _unpack_2layer_args(args, device, direction):
 
 
 def unpack_2layer_traffic_dict(func):
+    """
+    The decorator that simplifies accessing values within (many) and returning (<=2) traffic_dicts
+    a 2-layer traffic dict has the following structure of the layers:
+    1. device or flow ID
+    2. direction {'to', 'from'}
+    :param func:
+    :return:
+    """
     @functools.wraps(func)
     def wrapper(traffic_dict: dict, *args, **kwargs):
         new_dfs1 = defaultdict(dict)
@@ -78,33 +93,26 @@ def unpack_3layer_traffic_dict(func):
     return wrapper
 
 
-def iterate_traffic_dict(traff_dict):
+def iterate_2layer_dict(traff_dict):
     for device in traff_dict:
         for direction in traff_dict[device]:
             dat = traff_dict[device][direction]
             yield device, direction, dat
 
 
-def iterate_traffic_3_layers(traff_dict):
+def iterate_2layer_dict_copy(traffic):
+    for device in traffic:
+        for direction in traffic[device]:
+            df = traffic[device][direction].copy()
+            yield device, direction, df
+
+
+def iterate_3layer_dict(traff_dict):
     for device in traff_dict:
         for direction in traff_dict[device]:
             for parameter in traff_dict[device][direction]:
                 dat = traff_dict[device][direction][parameter]
                 yield device, direction, parameter, dat
-
-
-def iterate_dfs(traffic):
-    for device in traffic:
-        for direction in traffic[device]:
-            df = traffic[device][direction].copy()
-            yield df
-
-
-def iterate_dfs_plus(traffic):
-    for device in traffic:
-        for direction in traffic[device]:
-            df = traffic[device][direction].copy()
-            yield device, direction, df
 
 
 def profile(func):
@@ -294,14 +302,19 @@ def load_obj(name):
         return pickle.load(f)
 
 
-def getAddressList(file, typeIdent):
-    '''
-    getAddressList() returns a list with identifiers to process, empty if 'all'
-    specified
-    '''
+class TrafficObjects(Enum):
+    MAC = auto()
+    IP = auto()
+    FLOW = auto()
 
+
+def getAddressList(file, typeIdent: TrafficObjects):
+    '''
+    getAddressList() returns a list with identifiers to process, empty if file is None
+    '''
+    logger.info(f'entered getAddressList()')
     addressList = []
-    if file != 'all' and typeIdent != 'flow':
+    if file is not None and typeIdent != TrafficObjects.FLOW:
         with open(file, 'r') as f:
             print('Reading identifiers from the {} file...'.format(file))
             for line in f:
@@ -386,7 +399,7 @@ def print_parameters(header, dictWithDevices):
 
 def convert_arrays_to_dfs(samples):
     gener_dfs = construct_dict_2_layers(samples)
-    for device, direction, df in iterate_traffic_dict(samples):
+    for device, direction, df in iterate_2layer_dict(samples):
         gener_dfs[device][direction] = pd.DataFrame(df, columns=['pktLen', 'IAT'])
 
     return gener_dfs

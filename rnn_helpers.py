@@ -1,13 +1,11 @@
-from tensorflow import keras
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import GRU, Dense, Dropout
-from tensorflow.keras.callbacks import EarlyStopping
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import stat_tests
-from traffic_helpers import unpack_2layer_traffic_dict, construct_dict_2_layers, iterate_traffic_dict
-import ts_helpers as timeseries
-import matplotlib.pyplot as plt
+from tensorflow import keras
+from tensorflow.keras.layers import GRU, Dense, Dropout
+from tensorflow.keras.models import Sequential
+
+from traffic_helpers import unpack_2layer_traffic_dict
 
 
 class StopAtLossValue(keras.callbacks.Callback):
@@ -24,10 +22,10 @@ class StopAtLossValue(keras.callbacks.Callback):
 
 @unpack_2layer_traffic_dict
 def get_rnn_models(train_states, window_size, loss_threshold, layers=1):
-    # stop_callback = StopAtLossValue(loss_threshold)
-    stop_callback = EarlyStopping(patience=5,
-                                  restore_best_weights=True,
-                                  monitor='val_loss')
+    stop_callback = StopAtLossValue(loss_threshold)
+    # stop_callback = EarlyStopping(patience=5,
+    #                               restore_best_weights=True,
+    #                               monitor='val_loss')
     state_numb = int(max(set(train_states)) + 1)
     X, y = get_one_hot_training_states(train_states, window_size, step=5)
     model = build_gru_predictor(window_size, state_numb, layers=layers)
@@ -38,8 +36,6 @@ def get_rnn_models(train_states, window_size, loss_threshold, layers=1):
                         validation_split=0.2,
                         batch_size=20,
                         callbacks=[stop_callback])
-
-    pd.DataFrame(history.history).plot()
 
     return model
 
@@ -79,13 +75,20 @@ def change_pmf_temperature(preds, temperature=1.0):
     return np.argmax(probas)
 
 
-def rnn_gener_state(model, sample_number_to_gener, init_states, window_size, state_numb, temperature=1.0):
+def rnn_gener_state(model: keras.Model,
+                    full_init_states,
+                    window_size: int,
+                    temperature=1.0,
+                    sample_number_to_gener=None):
     # start_index = random.randint(0, len(init_states) - window_size - 1)
     start_index = 0
-    seed_states = init_states[start_index: start_index + window_size]
+    seed_states = full_init_states[start_index: start_index + window_size]
+    if not sample_number_to_gener:
+        sample_number_to_gener = len(full_init_states)
     generated_states = np.zeros(sample_number_to_gener)
     generated_states[:window_size] = seed_states
     # print('Testing temperature:', temperature)
+    state_numb = max(set(full_init_states)) + 1
     for i in range(sample_number_to_gener - window_size):
         # one-hot encode seed_states
         sampled = np.zeros((1, window_size, state_numb))
@@ -99,52 +102,6 @@ def rnn_gener_state(model, sample_number_to_gener, init_states, window_size, sta
         seed_states = np.roll(seed_states, -1)
 
     return generated_states
-
-
-def gener_rnn_states_with_temperature(model,
-                                      orig_states,
-                                      window_size,
-                                      sample_number_to_gener=None,
-                                      temperatures=None):
-    if not sample_number_to_gener:
-        sample_number_to_gener = len(orig_states)
-
-    state_numb = max(set(orig_states)) + 1
-    if not temperatures:
-        init_entropy = np.mean(timeseries.calc_windowed_entropy_discrete(orig_states))
-        temperatures = [init_entropy]
-        # if init_entropy < 1.7:
-        #     temperatures = [init_entropy - 0.2,
-        #                     init_entropy,
-        #                     init_entropy + 0.2]
-        # else:
-        #     temperatures = [init_entropy - 0.4,
-        #                     init_entropy - 0.2,
-        #                     init_entropy]
-        # print('\nSelected base temperature from init_states: {:.3f}'.format(
-        #     init_entropy))
-    temp_dist = {}
-    for temperature in temperatures:
-        print('Trying temperature={:.3f}...'.format(temperature))
-        rnn_states = rnn_gener_state(model,
-                                     sample_number_to_gener,
-                                     orig_states,
-                                     window_size,
-                                     state_numb,
-                                     temperature)
-
-        # min_len = min(len(rnn_states), len(init_states))
-        # distance = get_KL_divergence_pmf(init_states[:min_len],
-        #                                   rnn_states[:min_len],
-        #                                   state_numb)
-        temp_dist[temperature] = stat_tests.get_KL_divergence_pmf(orig_states,
-                                                                  rnn_states)
-
-        print('Got KL={:.3f}'.format(temp_dist[temperature]))
-
-    # print('\nBest KL divergence={:.3f} for states with temperature={:.3f}'.format(least_distance, best_temper))
-
-    return rnn_states
 
 
 def get_windowed_training_set_m2m(df, window_size, shift=1):

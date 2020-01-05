@@ -4,13 +4,14 @@ import settings
 from collections import defaultdict
 import numpy as np
 
+import traffic_helpers
+
 
 @pytest.fixture
 def traffic_dict():
     pcapfile = f'{settings.BASE_DIR}/traffic_dumps/skypeLANhome.pcap'
     return estimator.getTrafficFeatures(pcapfile,
-                                        typeIdent='flow',
-                                        fileIdent='all',
+                                        type_of_identifier=traffic_helpers.TrafficObjects.FLOW,
                                         percentiles=(1, 99),
                                         min_samples_to_estimate=100)[0]
 
