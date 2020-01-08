@@ -1,10 +1,18 @@
-# from traffic_helpers import *
-from gmm_helpers import *
-from timeseries import *
+from statsmodels import api as sm
+from statsmodels.tsa import api as smt
 
+import mixture_models
+import stat_metrics
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+import pandas as pd
+import numpy as np
+from collections import defaultdict
+
+import utils
+import settings
+from stat_metrics import calc_windowed_entropy_discrete
 
 FIG_PARAMS = {'low_iat': 0.0000001,
               'high_iat': 200,
@@ -12,13 +20,16 @@ FIG_PARAMS = {'low_iat': 0.0000001,
               'bins': 100}
 
 
-def plot_stat_properties(traffic_dfs, saveToFile=None):
-    '''
+RESULT_FOLDER = f'{settings.BASE_DIR}{os.sep}figures'
+
+
+def quantiles_acf_dfs(traffic_dfs, save_to=None):
+    """
     draws statistical figures for a traffic DataFrame, includes BoxPlot and Autocorrelation
     for PktLen and IAT
-    '''
+    """
 
-    for device, direction, df in iterate_2layer_dict(traffic_dfs):
+    for device, direction, df in utils.iterate_2layer_dict(traffic_dfs):
         fig, axes = plt.subplots(nrows=2, ncols=2)
         fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.4, hspace=0.4)
         fig.suptitle('{} {}'.format(direction, device))
@@ -33,18 +44,12 @@ def plot_stat_properties(traffic_dfs, saveToFile=None):
         axes[1, 0].xaxis.set_label_text('seconds')
         axes[1, 1].yaxis.set_label_text('Autocorrelation')
         axes[1, 1].xaxis.set_label_text('Lag')
-        if saveToFile:
-            plt.savefig('stat_figures' + os.sep + 'stat_props_' +
-                        mod_addr(device) + '_' + direction + '_' + saveToFile + '.pdf')
+        if save_to:
+            plt.savefig(RESULT_FOLDER + os.sep + 'stat_props_' +
+                        utils.mod_addr(device) + '_' + direction + '_' + save_to + '.pdf')
 
 
-def print_stat_properties(traffic_dfs, model='HMM'):
-    print('----------------\nModel {}:'.format(model))
-    for device, direction, df in iterate_2layer_dict(traffic_dfs):
-        print('{} {}:\n {}\n'.format(direction, device, df.describe().loc[['mean', 'std', '50%'], :]))
-
-
-def hist_2d_dfs(traffic_dfs, parameters=('pktLen', 'IAT'), logScale=False, states=None, saveToFile=None):
+def hist_2d_dfs(traffic_dfs, parameters=('pktLen', 'IAT'), log_scale=False, states=None, save_to=None):
     """
     plot2D() vizualizes 'IAT' and 'pktLen' parameters as a scatter plot
     """
@@ -60,7 +65,7 @@ def hist_2d_dfs(traffic_dfs, parameters=('pktLen', 'IAT'), logScale=False, state
                 colors = 'b'
             ax[dir_numb].scatter(df[parameters[1]], df[parameters[0]], c=colors, label=f"direction '{direction}'",
                                  alpha=0.2)  # , markeredgecolor='none', )
-            if logScale:
+            if log_scale:
                 ax[dir_numb].set_xscale('log')
             ax[dir_numb].set_xlabel('IAT, s')
             ax[dir_numb].set_ylabel('Payload size, bytes')
@@ -68,18 +73,18 @@ def hist_2d_dfs(traffic_dfs, parameters=('pktLen', 'IAT'), logScale=False, state
             ax[dir_numb].grid(True)
             ax[dir_numb].set_title(device)
 
-        if saveToFile:
-            plt.savefig('stat_figures' + os.sep + 'hist2d_' +
-                        mod_addr(device) + '_' + saveToFile + '.pdf')
+        if save_to:
+            plt.savefig(RESULT_FOLDER + os.sep + 'hist2d_' +
+                        utils.mod_addr(device) + '_' + save_to + '.pdf')
 
 
-def hist_dfs(traffic, logScale=True, saveToFile=None):
-    '''
+def hist_dfs(traffic, log_scale=True, save_to=None):
+    """
     hist_dfs() plots histograms from the layered dict with packet features.
     'logScale' affects only IAT parameter.
     'saveToFile' suppresses output and saves plots to the disk,
     (to exclude outliers)
-    '''
+    """
     with plt.style.context('bmh'):
         print('Preparing histograms for the traffic...')
         for device in traffic:
@@ -87,7 +92,7 @@ def hist_dfs(traffic, logScale=True, saveToFile=None):
             fig.suptitle('Histogram for ' + device, fontsize=16)
             ax = ax.flatten()
             dev_fig_props = define_figure_properties_per_device(
-                traffic[device], logScale)
+                traffic[device], log_scale)
 
             for direction in traffic[device]:
                 # create a plain figure
@@ -109,44 +114,44 @@ def hist_dfs(traffic, logScale=True, saveToFile=None):
                     # Annotate diagram
                     ax[plotNumb].set_xlabel(dev_fig_props[parameter]['x_subscr'])
 
-                    if (parameter == 'IAT') and logScale:
+                    if (parameter == 'IAT') and log_scale:
                         ax[plotNumb].set_xscale("log")
                     ax[plotNumb].set_title('direction: {} ({} packets)'.format(direction, len(deviceData)))
                     ax[plotNumb].grid(True)
                     fig.tight_layout()
                     fig.subplots_adjust(top=0.88)
-            if saveToFile:
-                plt.savefig('stat_figures' + os.sep + 'hist_' +
-                            mod_addr(device) + '_' + saveToFile + '.pdf')
+            if save_to:
+                plt.savefig(RESULT_FOLDER + os.sep + 'hist_' +
+                            utils.mod_addr(device) + '_' + save_to + '.pdf')
                 # else:
         plt.show()
     # plt.pause(0.001)
     # input("Press any key to continue.")
 
 
-def plot_hist_kde_em(traffic, kde_estimators, em_estimators=None, logScale=True, saveToFile=False,
+def plot_hist_kde_em(traffic, kde_estimators, em_estimators=None, log_scale=True, save_to_file=False,
                      min_samples_to_estimate=15):
-    '''
-    plot_hist_kde_em() plots histograms, KDEs and EM estimations from the 
+    """
+    plot_hist_kde_em() plots histograms, KDEs and EM estimations from the
     layered dict with packet features.
     'logScale' affects only IAT parameter.
     'saveToFile' suppresses output and saves plots to the disk,
     'percentile' defines the percentile above which the data should be omitted
     (to exclude outliers)
-    '''
+    """
 
     print('Preparing plots for the estimations...')
-    x_values = get_x_values_dict(traffic, logScale)
+    x_values = get_x_values_dict(traffic, log_scale)
 
-    kde_values = get_KDE_values(kde_estimators, x_values)
+    kde_values = mixture_models.get_KDE_values(kde_estimators, x_values)
 
     # em_values = get_EM_values(em_estimators)
-    em_values = get_EM_values_dict(em_estimators, x_values)
+    em_values = mixture_models.get_EM_values_dict(em_estimators, x_values)
 
     for device in traffic:
 
-        if len(traffic[device]['from']['ts']) < min_samples_to_estimate or len(
-                traffic[device]['to']['ts']) < min_samples_to_estimate:
+        if traffic[device]['from']['IAT'].shape[0] < min_samples_to_estimate or \
+                traffic[device]['to']['IAT'].shape[0] < min_samples_to_estimate:
             row_numb = 1
         else:
             row_numb = 2
@@ -155,7 +160,7 @@ def plot_hist_kde_em(traffic, kde_estimators, em_estimators=None, logScale=True,
         fig.suptitle('Estimations for ' + device, fontsize=16)
         ax = ax.flatten()
         dev_fig_props = define_figure_properties_per_device(
-            traffic[device], logScale)
+            traffic[device], log_scale)
 
         for direction in traffic[device]:
             # create a plain figure
@@ -193,21 +198,22 @@ def plot_hist_kde_em(traffic, kde_estimators, em_estimators=None, logScale=True,
                 # Annotate diagram
                 ax[plotNumb].set_xlabel(dev_fig_props[parameter]['x_subscr'])
 
-                if (parameter == 'IAT') and logScale:
+                if (parameter == 'IAT') and log_scale:
                     ax[plotNumb].set_xscale("log")
                 ax[plotNumb].set_title('direction: {} ({} packets)'.format(direction, len(deviceData)))
                 ax[plotNumb].grid(True)
-                # ax[plotNumb].set_ylim([0, max(max(kde_values[device][direction][parameter]),max(em_values[device][direction][parameter]))])
+                # ax[plotNumb].set_ylim([0, max(max(kde_values[device][direction][parameter]),
+                # max(em_values[device][direction][parameter]))])
                 fig.tight_layout()
                 fig.subplots_adjust(top=0.88)
-        if saveToFile:
-            figure_name = 'stat_figures' + os.sep + 'hist_' + mod_addr(device).replace(' ', '_') + '_' + '.svg'
+        if save_to_file:
+            figure_name = f'figures{os.sep}hist{utils.mod_addr(device).replace(" ", "_")}_.svg'
             print('Saved figure as {}'.format(figure_name))
             plt.savefig(figure_name)
             # else:
-    plt.draw()
-    plt.pause(0.001)
-    input("Press any key to continue.")
+    plt.show()
+    # plt.pause(0.001)
+    # input("Press any key to continue.")
 
 
 def getXAxisValues(parameter=None, logScale=False, max_param=None, traffic=None, precision=1000):
@@ -228,8 +234,8 @@ def getXAxisValues(parameter=None, logScale=False, max_param=None, traffic=None,
 
 
 def get_x_values_dict(traffic, logScale=False):
-    x_values = construct_new_dict_no_ts(traffic)
-    max_params = find_max_parameters(traffic)
+    x_values = utils.construct_new_dict_no_ts(traffic)
+    max_params = _find_max_parameters(traffic)
     for device in traffic:
         for direction in traffic[device]:
             for parameter in ['pktLen', 'IAT']:
@@ -244,7 +250,6 @@ def get_x_values_dict(traffic, logScale=False):
 
 
 def define_figure_properties_per_device(device_traffic, logScale=True):
-    global FIG_PARAMS
 
     device_props = {'IAT': {}, 'pktLen': {}}
     max_value = defaultdict(dict)
@@ -256,7 +261,7 @@ def define_figure_properties_per_device(device_traffic, logScale=True):
             except ValueError:
                 max_value[parameter][direction] = 0
 
-            if (parameter == 'pktLen'):
+            if parameter == 'pktLen':
 
                 try:
                     maxParam = FIG_PARAMS['high_pktlen'] if not device_traffic[direction][parameter] else \
@@ -271,7 +276,7 @@ def define_figure_properties_per_device(device_traffic, logScale=True):
                     0, maxParam, FIG_PARAMS['bins'])
                 device_props[parameter]['plot_numb'] = 0
 
-            elif (parameter == 'IAT'):
+            elif parameter == 'IAT':
 
                 try:
                     maxParam = FIG_PARAMS['high_iat'] if not device_traffic[direction][parameter] else \
@@ -299,16 +304,15 @@ def define_figure_properties_per_device(device_traffic, logScale=True):
 
 
 def defineFigureProperties(parameter, logScale, traffic=None, percentile=100):
-    global FIG_PARAMS
     fig_prop = {}
     # hist_prop = {}
-    if (parameter == 'pktLen'):
+    if parameter == 'pktLen':
         fig_prop['param'] = 'Payload Length'
         fig_prop['unit'] = ", bytes"
         fig_prop['range'] = (0, 1500)
         fig_prop['bins'] = np.linspace(0, 1500, FIG_PARAMS['bins'])
         fig_prop['plot_numb'] = 0
-    elif (parameter == 'IAT'):
+    elif parameter == 'IAT':
         fig_prop['param'] = 'IAT'
         fig_prop['unit'] = ", s"
         fig_prop['range'] = (0, FIG_PARAMS['high_iat']
@@ -326,42 +330,10 @@ def defineFigureProperties(parameter, logScale, traffic=None, percentile=100):
     return fig_prop
 
 
-def plot_iat_pktlen(df):
-    df = df.copy()
-    # plt.figure()
-    fig, axes = plt.subplots(nrows=1, ncols=2)
-    df.index = [i for i in range(df.shape[0])]
-    df['IAT'].plot(ax=axes[0])
-    axes[0].xaxis.set_label_text('packet #')
-    axes[0].yaxis.set_label_text('IAT, s')
-    df['pktLen'].plot(ax=axes[1])
-    axes[1].xaxis.set_label_text('packet #')
-    axes[1].yaxis.set_label_text('Packet Size, bytes')
-    plt.show()
-
-
-def plot_acf_df(df, lags=None):
-    with plt.style.context('bmh'):
-        if not lags:
-            lags = round(len(df['pktLen']))
-        fig, axes = plt.subplots(nrows=1, ncols=2)
-        smt.graphics.plot_acf(df['IAT'], lags=lags, ax=axes[0])
-        # pd.Series([df['IAT'].autocorr(lag)
-        #           for lag in range(lags)]).plot(ax=axes[0], grid=1)
-        axes[0].xaxis.set_label_text('Lag')
-        axes[0].yaxis.set_label_text('ACF, IAT')
-        smt.graphics.plot_acf(df['pktLen'], lags=lags, ax=axes[1])
-        # pd.Series([df['pktLen'].autocorr(lag)
-        #           for lag in range(lags)]).plot(ax=axes[1], grid=1)
-        axes[1].xaxis.set_label_text('Lag')
-        axes[1].yaxis.set_label_text('ACF, Packet Size')
-        plt.show()
-
-
-def features_acf_dfs(dfs, lags=500, saveToFile=None):
+def features_acf_dfs(dfs, lags=500, save_to=None):
     fig, ax = plt.subplots(nrows=4, ncols=2, figsize=[14, 7])
     plot_counter = 0
-    for device, direction, df in iterate_2layer_dict_copy(dfs):
+    for device, direction, df in utils.iterate_2layer_dict_copy(dfs):
         df.index = [i for i in range(df.shape[0])]
         df['pktLen'].plot(ax=ax[plot_counter, 0], grid=1)
         ax[plot_counter, 0].yaxis.set_label_text('PS, bytes')
@@ -384,13 +356,13 @@ def features_acf_dfs(dfs, lags=500, saveToFile=None):
         plot_counter += 2
 
     plt.tight_layout()
-    if saveToFile:
-        plt.savefig('stat_figures' + os.sep + saveToFile)
+    if save_to:
+        plt.savefig(RESULT_FOLDER + os.sep + save_to)
 
     plt.show()
 
 
-def goodput(df, resolution='1S', plot=True, saveToFile=None):
+def goodput(df, resolution='1S', plot=True, save_to=None):
     plt.figure()
     # replace indexes with DateTime format
     df.index = pd.to_datetime(df.IAT.cumsum(), unit='s')
@@ -398,30 +370,29 @@ def goodput(df, resolution='1S', plot=True, saveToFile=None):
 
     ax = (goodput_df['pktLen'] / 1024).plot(grid=True, lw=3)  # label=direction
     # for {device}')
-    ax.set(xlabel='time', ylabel='KB per ' + resolution, title=f'Goodput')
+    ax.set(xlabel='time', ylabel=f'KB per {resolution}', title=f'Goodput')
     # ax.legend()
     plt.show()
-    if saveToFile:
-        plt.savefig('stat_figures' + os.sep + saveToFile)
+    if save_to:
+        plt.savefig(RESULT_FOLDER + os.sep + save_to)
 
 
-def goodput_dfs(dfs, resolution='1S', saveToFile=None):
+def goodput_dfs(dfs, resolution='1S', save_to=None):
     fig, ax = plt.subplots(nrows=1, ncols=2, figsize=[12, 5])
     plot_counter = 0
-    for device, direction, df in iterate_2layer_dict_copy(dfs):
+    for device, direction, df in utils.iterate_2layer_dict_copy(dfs):
         # replace indexes with DateTime format
         df.index = pd.to_datetime(df.IAT.cumsum(), unit='s')
         goodput_df = df.resample(resolution).sum()
 
-        # for {device}')
         (goodput_df['pktLen'] / 1024).plot(grid=True, lw=3, ax=ax[plot_counter])  # label=direction
         ax[plot_counter].set(xlabel='time',
                              ylabel='Goodput kB/' + resolution,
                              title=direction + ' ' + device)
         # ax.legend()
         plot_counter += 1
-    if saveToFile:
-        plt.savefig('stat_figures' + os.sep + saveToFile)
+    if save_to:
+        plt.savefig(RESULT_FOLDER + os.sep + save_to)
 
     plt.show()
 
@@ -431,14 +402,14 @@ def entropies_dfs(traffic_dfs,
                   smoothing=10,
                   kde_bins=500,
                   window=50,
-                  saveToFile=None):
+                  save_to=None):
     entrs = []
     legends = []
     params = []
     plt.figure()
-    for device, direction, parameter, ser in iterate_3layer_dict(traffic_dfs):
-        entropy = calc_windowed_entropy_cont(traffic_dfs[device][direction][parameter], kde_bins=kde_bins,
-                                             window=window)
+    for device, direction, parameter, ser in utils.iterate_3layer_dict(traffic_dfs):
+        entropy = stat_metrics.calc_windowed_entropy_cont(traffic_dfs[device][direction][parameter], kde_bins=kde_bins,
+                                                          window=window)
         mean_entropy = np.mean(entropy)
         entrs.append(mean_entropy)
         if parameter == 'pktLen':
@@ -446,36 +417,31 @@ def entropies_dfs(traffic_dfs,
         params.append(direction + ', ' + parameter)
         legends.append('{:4} | {:3} | avg={:1.2f}'.format(direction, parameter, mean_entropy))
         ax = pd.Series(entropy).rolling(smoothing, center=True).mean().plot(grid=True)
-        # plot_series_and_ma(entropy, ma_window=5)
 
     ax.legend(legends)
-    ax.set_title('{} | Rolling entropy, window={}, smoothing={}'.format(device, window,
+    ax.set_title('{} | Rolling entropy, window={}, smoothing={}'.format(device,
+                                                                        window,
                                                                         smoothing))
     entr_series = pd.Series(entrs, index=params)
-    # print(entr_series)
     if bar:
         plt.figure()
         ax = entr_series.plot(kind='bar', grid=True, rot=30)
         ax.set_title('Average entropy of parameters')
         # ax.set_xticks(legends)
-    if saveToFile:
-        plt.savefig('stat_figures' + os.sep + saveToFile)
+    if save_to:
+        plt.savefig(RESULT_FOLDER + os.sep + save_to)
     plt.show()
 
     return entr_series
 
 
 def hist_3d(dfs, save_to=None):
-    from mpl_toolkits.mplot3d import Axes3D
-    # from matplotlib import cm
-    # from matplotlib.ticker import LinearLocator, FormatStrFormatter
-
     fig = plt.figure(figsize=(14, 7))
     plot_idx = 1
-    for device, direction, df in iterate_2layer_dict(dfs):
+    for device, direction, df in utils.iterate_2layer_dict(dfs):
         ax = fig.add_subplot(1, 2, plot_idx, projection='3d')
         # Make data.
-        hist, xedges, yedges = np.histogram2d(df['IAT'], df['pktLen'], bins=40, normed=0)
+        hist, xedges, yedges = np.histogram2d(df['IAT'], df['pktLen'], bins=40, normed=False)
 
         xpos, ypos = np.meshgrid(xedges[:-1] + 0.25, yedges[:-1] + 0.25, indexing="ij")
         xpos = xpos.ravel()
@@ -494,7 +460,7 @@ def hist_3d(dfs, save_to=None):
         plot_idx += 1
     plt.tight_layout()
     if save_to:
-        plt.savefig('stat_figures' + os.sep + save_to)
+        plt.savefig(RESULT_FOLDER + os.sep + save_to)
     plt.show()
 
 
@@ -504,7 +470,7 @@ def hist_joint_dfs(dfs, save_to=None):
     # fig.subplots_adjust(wspace=0.5)
 
     fig_shifter = 0
-    for device, direction, df in iterate_2layer_dict_copy(dfs):
+    for device, direction, df in utils.iterate_2layer_dict_copy(dfs):
 
         # df = df.copy()
         df.index = [i for i in range(df.shape[0])]
@@ -531,4 +497,123 @@ def hist_joint_dfs(dfs, save_to=None):
 
     fig.tight_layout()
     if save_to:
-        plt.savefig('stat_figures' + os.sep + save_to)
+        plt.savefig(RESULT_FOLDER + os.sep + save_to)
+
+
+def ts_analysis_plot(y, lags=None, figsize=(12, 7), style='bmh'):
+    """
+        Plot time series, its ACF and PACF, calculate Dickey–Fuller test
+
+        y - timeseries
+        lags - how many lags to include in ACF, PACF calculation
+    """
+    if not isinstance(y, pd.Series):
+        y = pd.Series(y)
+
+    with plt.style.context(style):
+        fig = plt.figure(figsize=figsize)
+        layout = (2, 2)
+        ts_ax = plt.subplot2grid(layout, (0, 0), colspan=2)
+        acf_ax = plt.subplot2grid(layout, (1, 0))
+        pacf_ax = plt.subplot2grid(layout, (1, 1))
+
+        y.plot(ax=ts_ax)
+        p_value = sm.tsa.stattools.adfuller(y)[1]
+        ts_ax.set_title(
+            'Time Series Analysis Plots\n Dickey-Fuller: p={0:.5f}'.format(p_value))
+        smt.graphics.plot_acf(y, lags=lags, ax=acf_ax)
+        smt.graphics.plot_pacf(y, lags=lags, ax=pacf_ax)
+        plt.tight_layout()
+        plt.show()
+
+
+def ts_acf_plot(y, lags=None, figsize=None, style='bmh'):
+    """
+        Plot time series, its ACF and PACF
+
+        y - timeseries
+        lags - how many lags to include in ACF, PACF calculation
+    """
+    if not isinstance(y, pd.Series):
+        y = pd.Series(y)
+
+    with plt.style.context(style):
+        fig, axes = plt.subplots(nrows=1, ncols=2)  # , figsize=(10, 4))
+
+        # fig = plt.figure()
+        # layout = (1, 2)
+        # ts_ax = plt.subplot2grid(layout, (0, 0), colspan=2)
+        # acf_ax = plt.subplot2grid(layout, (0, 0))
+        # pacf_ax = plt.subplot2grid(layout, (0, 1))
+
+        # p_value = sm.tsa.stattools.adfuller(y)[1]
+        smt.graphics.plot_acf(y, lags=lags, ax=axes[0])
+        smt.graphics.plot_pacf(y, lags=lags, ax=axes[1])
+        # plt.tight_layout()
+        plt.show()
+
+
+def df_analysis_plot(df, lags=100):
+    for parameter in df:
+        print(parameter)
+        ts_analysis_plot(df[parameter], lags=lags)
+
+
+def plot_states(states, state_numb=None, figsize=(12, 5)):
+    if not state_numb:
+        state_numb = len(set(states))
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=figsize)
+    pd.Series(states).hist(bins=state_numb, ax=axes[0])
+    pd.Series(states).plot(style='.', ax=axes[1])
+    plt.show()
+
+
+def plot_series_and_ma(series, ma_window=None, center=True):
+    if not isinstance(series, pd.Series):
+        series = pd.Series(series)
+
+    plt.figure()
+
+    if ma_window:
+        series.rolling(ma_window, center=center).mean().plot(linewidth=4)  # ,color='g')
+    series.plot()
+    plt.show()
+
+
+def plot_states_reports(states, options='ste', orig_states=None):
+    if 's' in options:
+        utils.unpack_2layer_traffic_dict(plot_states)(states)
+    if 't' in options:
+        utils.unpack_2layer_traffic_dict(ts_analysis_plot)(states, lags=100)
+    entropy = utils.unpack_2layer_traffic_dict(calc_windowed_entropy_discrete)(states)
+    print('Entropy stats:\n{}\n'.format(pd.DataFrame(*list(entropy.values())).describe().loc[:, :]))
+    if 'e' in options:
+        utils.unpack_2layer_traffic_dict(plot_series_and_ma)(entropy, ma_window=6)
+    if orig_states:
+        print('KL divergence:\n{}'.format(
+            pd.DataFrame(utils.unpack_2layer_traffic_dict(stat_metrics.get_KL_divergence_pmf)(orig_states, states)).T))
+
+
+def ts_acfs_dfs(dfs, lags=200, save_to=None, style='bmh'):
+    with plt.style.context(style):
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12, 5))
+        plot_counter = 0
+        for device, direction, y in utils.iterate_2layer_dict(dfs):
+            smt.graphics.plot_acf(y, lags=lags, ax=axes[plot_counter, 0], title='ACF | {}'.format(direction))
+            smt.graphics.plot_pacf(y, lags=lags, ax=axes[plot_counter, 1], title='Partial ACF | {}'.format(direction))
+            plot_counter += 1
+        plt.tight_layout()
+        if save_to:
+            plt.savefig(RESULT_FOLDER + os.sep + save_to)
+        plt.show()
+
+
+def _find_max_parameters(traffic_dfs):
+    max_params = {'pktLen': 0, 'IAT': 0}
+
+    for device in traffic_dfs:
+        for parameter in ['pktLen', 'IAT']:
+            max_params[parameter] = max(
+                [max(traffic_dfs[device]['from'][parameter]), max(traffic_dfs[device]['to'][parameter])])
+
+    return max_params

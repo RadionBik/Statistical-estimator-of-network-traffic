@@ -1,19 +1,19 @@
 import pytest
-import stat_estimator as estimator
+import pcap_parser as estimator
 import settings
 from collections import defaultdict
 import numpy as np
 
-import traffic_helpers
+import utils
 
 
 @pytest.fixture
 def traffic_dict():
     pcapfile = f'{settings.BASE_DIR}/traffic_dumps/skypeLANhome.pcap'
-    return estimator.getTrafficFeatures(pcapfile,
-                                        type_of_identifier=traffic_helpers.TrafficObjects.FLOW,
-                                        percentiles=(1, 99),
-                                        min_samples_to_estimate=100)[0]
+    return estimator.get_traffic_features(pcapfile,
+                                          type_of_identifier=utils.TrafficObjects.FLOW,
+                                          percentiles=(1, 99),
+                                          min_samples_to_estimate=100)[0]
 
 
 @pytest.fixture

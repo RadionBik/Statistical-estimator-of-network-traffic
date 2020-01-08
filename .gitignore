@@ -1,6 +1,6 @@
-figures/
-log/
-jupyter_notebooks/
+old_figures/
+old_logs/
+voice_modeling_report/
 #traffic_dumps/*
 .idea/
 .directory
@@ -8,13 +8,13 @@ jupyter_notebooks/
 venv
 
 temp_py/
-#stat_figures/
+#figures/
 __pychache__
 .ipynb_checkpoints/
 rnn_models/
 estimator_libs/
 *.prof
-#*.ipynb
+*.ipynb
 *.docx
 *.pkl
 *.pyc
@@ -22,10 +22,10 @@ estimator_libs/
 *.pcap
 *.svg
 *.pdf
-stat_figures
+figures
 deviceStat.ipynb
 rnn_test.ipynb
-#stat_figures/*.svg
+#figures/*.svg
 test_*
 bin/ndpi_deb
 bin/ndpi_arch
@@ -33,6 +33,7 @@ extractPacketStats.py
 compare_pcaps.py
 
 #add a file to each dir for structuring
-!rtp_711_UDP_10_1_3_143_5000_auto_components.pkl
+!obj/skypeLANhome__auto_components.pkl
 #!hist_UDP_10_1_3_143_5000_10_1_6_18_2006_.svg
-!*/skypeLANhome.pcap
+!traffic_dumps/skypeLANhome.pcap
+!figures/joint2d_skype.pdf

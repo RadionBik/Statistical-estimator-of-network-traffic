@@ -1,11 +1,12 @@
+import logging
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from tensorflow import keras
-from tensorflow.keras.layers import GRU, Dense, Dropout
-from tensorflow.keras.models import Sequential
+from utils import unpack_2layer_traffic_dict
 
-from traffic_helpers import unpack_2layer_traffic_dict
+
+logger = logging.getLogger(__name__)
 
 
 class StopAtLossValue(keras.callbacks.Callback):
@@ -18,45 +19,6 @@ class StopAtLossValue(keras.callbacks.Callback):
             logs = {}
         if logs.get('loss') <= self.threshold:
             self.model.stop_training = True
-
-
-@unpack_2layer_traffic_dict
-def get_rnn_models(train_states, window_size, loss_threshold, layers=1):
-    stop_callback = StopAtLossValue(loss_threshold)
-    # stop_callback = EarlyStopping(patience=5,
-    #                               restore_best_weights=True,
-    #                               monitor='val_loss')
-    state_numb = int(max(set(train_states)) + 1)
-    X, y = get_one_hot_training_states(train_states, window_size, step=5)
-    model = build_gru_predictor(window_size, state_numb, layers=layers)
-
-    history = model.fit(X,
-                        y,
-                        epochs=100,
-                        validation_split=0.2,
-                        batch_size=20,
-                        callbacks=[stop_callback])
-
-    return model
-
-
-def build_gru_predictor(window_size, state_numb, layers=1):
-    model = Sequential()
-    for _ in range(layers - 1):
-        model.add(GRU(state_numb,
-                      activation='relu',
-                      input_shape=(window_size, state_numb),
-                      return_sequences=True))
-
-    model.add(GRU(state_numb, input_shape=(window_size, state_numb)))
-    model.add(Dropout(0.2))
-    model.add(Dense(state_numb, activation='softmax'))
-
-    optimizer = keras.optimizers.RMSprop(lr=0.005)
-    model.compile(loss='categorical_crossentropy',
-                  optimizer=optimizer,
-                  )
-    return model
 
 
 @unpack_2layer_traffic_dict
@@ -87,7 +49,7 @@ def rnn_gener_state(model: keras.Model,
         sample_number_to_gener = len(full_init_states)
     generated_states = np.zeros(sample_number_to_gener)
     generated_states[:window_size] = seed_states
-    # print('Testing temperature:', temperature)
+    # logger.info('Testing temperature:', temperature)
     state_numb = max(set(full_init_states)) + 1
     for i in range(sample_number_to_gener - window_size):
         # one-hot encode seed_states
@@ -137,7 +99,7 @@ def get_windowed_training_set_m2o(df, window_size, shift=1):
     sample_number = df.shape[0]
     X = np.zeros((sample_number - window_size + 1, window_size, feature_number))
     y = np.zeros((sample_number - window_size + 1, feature_number))
-    print(X.shape)
+    logger.info(X.shape)
     if len(df.shape) == 1:
         for batch in range(sample_number - window_size):
             X[batch, :, 0] = df.iloc[batch:batch + window_size]
@@ -163,8 +125,8 @@ def get_one_hot_training_states(states, window_size, step=3):
         sentences.append(states[i: i + window_size])
         next_states.append(states[i + window_size])
 
-    print('Number of sequences:', len(sentences))
-    print('Unique states:', len(unique_states))
+    logger.info('Number of sequences:', len(sentences))
+    logger.info('Unique states:', len(unique_states))
 
     # one-hot encoding
     x = np.zeros((len(sentences), window_size, state_numb), dtype=np.bool)
@@ -180,7 +142,7 @@ def get_one_hot_training_states(states, window_size, step=3):
 
 
 def plot_training_val(history, metric=None):
-    print(history.history.keys())
+    logger.info(history.history.keys())
 
     loss = history.history['loss']
     val_loss = history.history['val_loss']

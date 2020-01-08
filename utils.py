@@ -4,36 +4,17 @@ import socket
 import functools
 
 from collections import defaultdict
-from enum import Enum, auto
+from enum import Enum
 
-import numpy as np
 import pandas as pd
 from dpkt.compat import compat_ord
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import cProfile
 import logging
+import settings
 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-
-def get_df_from_traffic(traffic):
-    traffic_df = defaultdict(dict)
-    for device in traffic:
-        for direction in traffic[device]:
-            traffic_df[device][direction] = pd.DataFrame()
-            timestamps = pd.Series(traffic[device][direction]['ts'])
-            traffic_df[device][direction]['IAT'] = timestamps.diff().fillna(value=0)
-
-            traffic_df[device][direction]['pktLen'] = pd.Series(traffic[device][direction]['pktLen'])
-
-            traffic_df[device][direction].index = pd.to_datetime(timestamps, unit='s') - pd.to_datetime(timestamps[0],
-                                                                                                        unit='s')
-
-            # traffic_df[device][direction]['window_pkt'] = traffic_df[device][direction]['pktLen'].rolling('1S').sum()
-
-    return traffic_df
 
 
 def _unpack_2layer_args(args, device, direction):
@@ -54,6 +35,7 @@ def unpack_2layer_traffic_dict(func):
     :param func:
     :return:
     """
+
     @functools.wraps(func)
     def wrapper(traffic_dict: dict, *args, **kwargs):
         new_dfs1 = defaultdict(dict)
@@ -128,37 +110,10 @@ def profile(func):
     return wrapper
 
 
-def find_max_parameters(traffic_dfs):
-    max_params = {'pktLen': 0, 'IAT': 0}
-
-    for device in traffic_dfs:
-        for parameter in ['pktLen', 'IAT']:
-            max_params[parameter] = max(
-                [max(traffic_dfs[device]['from'][parameter]), max(traffic_dfs[device]['to'][parameter])])
-
-    return max_params
-
-
-def find_max_iat(device_traffic):
-    # find the max IAT among all directions
-    maxParam = {}
-    for device in device_traffic:
-        maxParam[device] = 0
-        for direction in device_traffic[device]:
-            for parameter in device_traffic[device][direction]:
-                if (parameter == 'IAT') and device_traffic[device][direction][parameter]:
-                    max_value = max(device_traffic[device][direction][parameter])
-                    if max_value > maxParam[device]:
-                        maxParam[device] = max_value
-                else:
-                    continue
-    return maxParam
-
-
 def mod_addr(mac):
-    '''
+    """
     replaces : and . with _ for addresses to enable saving to a disk
-    '''
+    """
     return mac.replace(':', '_').replace('.', '_').replace(' ', '_')
 
 
@@ -203,16 +158,16 @@ def is_ip_port(string):
 
 def get_5_tuple_fields(string):
     try:
-        tupleDict = {'proto': string.split(' ')[0],
-                     'ip_s': string.split(' ')[1].split(':')[0],
-                     'port_s': string.split(' ')[1].split(':')[1],
-                     'ip_d': string.split(' ')[2].split(':')[0],
-                     'port_d': string.split(' ')[2].split(':')[1]}
+        tuple_dict = {'proto': string.split(' ')[0],
+                      'ip_s': string.split(' ')[1].split(':')[0],
+                      'port_s': string.split(' ')[1].split(':')[1],
+                      'ip_d': string.split(' ')[2].split(':')[0],
+                      'port_d': string.split(' ')[2].split(':')[1]}
 
-        return tupleDict
+        return tuple_dict
 
     except IndexError:
-        print('Catched either empty or incorrect lines. Ignoring.')
+        logger.info('Catched either empty or incorrect lines. Ignoring.')
 
 
 def is_5_tuple(string):
@@ -269,140 +224,55 @@ def construct_new_dict_no_ts(ref_dict):
     return new_dict
 
 
-def get_IAT(TS):
-    '''
-    get_IAT() returns list with 'IAT', taking 'ts' list as the input
-    '''
-    iteration = 0
-    IAT = []
-    for ts in TS:
-        if iteration == 0:
-            IAT.append(0)
-            tempIAT = ts
-            iteration = iteration + 1
-        else:
-            IAT.append(ts - tempIAT)
-            tempIAT = ts
-    return IAT
-
-
 def save_obj(obj, name):
-    '''
+    """
     save_obj() saves python object to the file inside 'obj' directory
-    '''
-    with open('obj/' + name + '.pkl', 'wb') as f:
+    """
+    with open(f'{settings.BASE_DIR}/obj/{name}.pkl', 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 
 def load_obj(name):
-    '''
+    """
     load_obj() loads python object from the file inside 'obj' directory
-    '''
-    with open('obj/' + name + '.pkl', 'rb') as f:
+    """
+    with open(f'{settings.BASE_DIR}/obj/{name}.pkl', 'rb') as f:
         return pickle.load(f)
 
 
 class TrafficObjects(Enum):
-    MAC = auto()
-    IP = auto()
-    FLOW = auto()
+    MAC = 'MAC'
+    IP = 'IP'
+    FLOW = 'flow'
 
 
-def getAddressList(file, typeIdent: TrafficObjects):
-    '''
-    getAddressList() returns a list with identifiers to process, empty if file is None
-    '''
-    logger.info(f'entered getAddressList()')
-    addressList = []
-    if file is not None and typeIdent != TrafficObjects.FLOW:
-        with open(file, 'r') as f:
-            print('Reading identifiers from the {} file...'.format(file))
-            for line in f:
-                if line[0] == '#':
-                    continue
-                # print(line, end='')
-                addressList.append(line.rstrip())
-    return addressList
-
-
-def get_data_below_percentile(device_traffic, percentile):
-    new_traffic = []
-    for entry in device_traffic:
-        if entry > np.percentile(device_traffic, percentile):
-            continue
-        new_traffic.append(entry)
-
-    return new_traffic
-
-
-def get_data_within_percentiles(device_traffic, percentiles):
-    new_traffic = []
-    upper_bound = np.percentile(device_traffic, percentiles[1])
-    lower_bound = np.percentile(device_traffic, percentiles[0])
-
-    for entry in device_traffic:
-        if entry > upper_bound or entry < lower_bound:
-            continue
-        new_traffic.append(entry)
-
-    return new_traffic
-
-
-def getTrafficExtremeValues(traffic):
-    '''
-    getTrafficExtremeValues() extracts extreme values i.e. max and 
-    min values of 'IAT' and 'pktLen' from traffic dict and returns 
+def get_traffic_extreme_values(traffic):
+    """
+    get_traffic_extreme_values() extracts extreme values i.e. max and
+    min values of 'IAT' and 'pktLen' from traffic dict and returns
     dict with them
-    '''
+    """
 
-    extremeValues = defaultdict(dict)
+    extreme_values = defaultdict(dict)
     for device in traffic:
         for direction in traffic[device]:
-            extremeValues[device][direction] = {'pktLen': {}, 'IAT': {}}
+            extreme_values[device][direction] = {'pktLen': {}, 'IAT': {}}
             for parameter in ['pktLen', 'IAT']:
-                extremeValues[device][direction][parameter] = {
+                extreme_values[device][direction][parameter] = {
                     'max': 0, 'min': 0}
 
                 try:
-                    extremeValues[device][direction][parameter]['min'] = min(
+                    extreme_values[device][direction][parameter]['min'] = min(
                         traffic[device][direction][parameter])
                 except ValueError:
-                    extremeValues[device][direction][parameter]['min'] = 0
+                    extreme_values[device][direction][parameter]['min'] = 0
                 try:
-                    extremeValues[device][direction][parameter]['max'] = max(
+                    extreme_values[device][direction][parameter]['max'] = max(
                         traffic[device][direction][parameter])
                 except ValueError:
-                    extremeValues[device][direction][parameter]['max'] = 0
+                    extreme_values[device][direction][parameter]['max'] = 0
 
-    return extremeValues
-
-
-def get_pcap_filename(args):
-    return args.p.split('/')[len(args.p.split('/')) - 1].split('.')[0]
-
-
-def print_parameters(header, dictWithDevices):
-    print('\n')
-    print(header)
-    for device in dictWithDevices:
-        print(device)
-        for direction in dictWithDevices[device]:
-            for parameter in dictWithDevices[device][direction]:
-                par = dictWithDevices[device][direction][parameter]
-                if isinstance(par, float):
-                    formatPar = '{0:8s} {1:6s}: {2:3.3f}'
-                else:
-                    formatPar = '{0:8s} {1:6s}: {2}'
-                print(formatPar.format(parameter, direction, par))
-    # print('\n')
-
-
-def convert_arrays_to_dfs(samples):
-    gener_dfs = construct_dict_2_layers(samples)
-    for device, direction, df in iterate_2layer_dict(samples):
-        gener_dfs[device][direction] = pd.DataFrame(df, columns=['pktLen', 'IAT'])
-
-    return gener_dfs
+    return extreme_values
 
 
 @unpack_2layer_traffic_dict
