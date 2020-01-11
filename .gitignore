@@ -36,4 +36,5 @@ compare_pcaps.py
 !obj/skypeLANhome__auto_components.pkl
 #!hist_UDP_10_1_3_143_5000_10_1_6_18_2006_.svg
 !traffic_dumps/skypeLANhome.pcap
+!traffic_dumps/iot_amazon_echo.pcap
 !figures/joint2d_skype.pdf
