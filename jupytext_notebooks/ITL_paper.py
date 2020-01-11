@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 # ---
 # jupyter:
-#   jupytext_notebooks:
+#   jupytext:
 #     formats: ipynb,py:percent
+#     notebook_metadata_filter: notebooks_jupytext
 #     text_representation:
 #       extension: .py
 #       format_name: percent
@@ -12,6 +13,13 @@
 #     display_name: Python 3
 #     language: python
 #     name: python3
+#   notebooks_jupytext:
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.3.1
 # ---
 
 # %%
@@ -64,7 +72,7 @@ else:
                             rnn_hidden_layers=2,
                             pcap_file='../traffic_dumps/iot_amazon_echo.pcap',
                             pcap_identifier=utils.TrafficObjects.MAC,
-                            device_identifier='addresses_to_check.txt')
+                            device_identifier='../addresses_to_check.txt')
 
 # %%
 traffic_dfs = pcap_parser.get_traffic_features(CONFIG.pcap_file,
@@ -101,22 +109,21 @@ gmm_states = rnn_utils.get_mixture_state_predictions(gmm_models, norm_traffic)
 # preprocessors.unpack_2layer_traffic_dict(timeseries.df_analysis_plot)(traffic_dfs, lags=400)
 
 # %%
-plotting.hist_joint_dfs(traffic_dfs)  # , save_to='joint2d_skype.pdf')
+plotting.hist_joint_dfs(traffic_dfs, save_to=f'joint2d_{CONFIG.scenario}.pdf')
 plotting.goodput_dfs(traffic_dfs)
-plotting.features_acf_dfs(traffic_dfs, lags=500)  # , saveToFile='acf_df_skype_orig.pdf')
+plotting.features_acf_dfs(traffic_dfs, lags=500)
 
 # %% [markdown]
 # RNN_WINDOW_SIZE was selected according to ACF of the states below 
 
 # %%
-plotting.ts_acfs_dfs(gmm_states, lags=300)  # , saveToFile='skype_gmm')
+plotting.ts_acfs_dfs(gmm_states, lags=300) 
 plotting.plot_states_reports(gmm_states, options='ste')
 
 # %% [markdown]
 # ## Hidden Markov Model
 
 # %%
-# hmm_models_calc = apply_to_2dicts(get_hmm_from_gmm_pred_calc_transitions, gmm_models, gmm_pred_states)
 hmm_models_fit = utils.unpack_2layer_traffic_dict(markov_models.get_hmm_from_gmm_estimate_transitions)(gmm_models,
                                                                                                        norm_traffic)
 hmm_states = markov_models.gener_hmm_states(hmm_models_fit, traffic_dfs)

@@ -125,8 +125,8 @@ def get_one_hot_training_states(states, window_size, step=3):
         sentences.append(states[i: i + window_size])
         next_states.append(states[i + window_size])
 
-    logger.info('Number of sequences:', len(sentences))
-    logger.info('Unique states:', len(unique_states))
+    logger.info(f'Number of sequences: {len(sentences)}')
+    logger.info(f'Unique states: {len(unique_states)}')
 
     # one-hot encoding
     x = np.zeros((len(sentences), window_size, state_numb), dtype=np.bool)
@@ -142,7 +142,7 @@ def get_one_hot_training_states(states, window_size, step=3):
 
 
 def plot_training_val(history, metric=None):
-    logger.info(history.history.keys())
+    print(history.history.keys())
 
     loss = history.history['loss']
     val_loss = history.history['val_loss']
