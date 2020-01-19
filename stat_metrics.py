@@ -151,3 +151,21 @@ def calc_windowed_entropy_cont(series, window=50, kde_bins=1500):
     # print(windowed_entropy)
 
     return pd.Series(windowed_entropy).fillna(0)
+
+
+def calc_smoothed_entropies_dfs(traffic_dfs, smoothing=5, window=50, kde_bins=500) -> pd.DataFrame:
+    smoothed_entropies = {}
+
+    for device, direction, parameter, value in utils.iterate_3layer_dict(traffic_dfs):
+        entropy = calc_windowed_entropy_cont(value,
+                                             kde_bins=kde_bins,
+                                             window=window)
+
+        legend = '{:4} | {:3} | avg={:1.2f}'.format(direction,
+                                                    'PS' if parameter == 'pktLen' else parameter,
+                                                    np.mean(entropy))
+
+        smoothed_entropy = pd.Series(entropy).rolling(smoothing, center=True).mean()
+        smoothed_entropies.update({legend: smoothed_entropy})
+
+    return pd.DataFrame(smoothed_entropies)

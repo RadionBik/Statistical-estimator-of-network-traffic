@@ -29,6 +29,7 @@
 # %autoreload 2
 # %matplotlib inline
 import sys
+
 sys.path.append("..")
 from dataclasses import dataclass
 import mixture_models
@@ -38,6 +39,7 @@ import rnn_utils
 import pcap_parser
 import utils
 import stat_metrics
+import numpy as np
 
 
 # %%
@@ -117,7 +119,7 @@ plotting.features_acf_dfs(traffic_dfs, lags=500)
 # RNN_WINDOW_SIZE was selected according to ACF of the states below 
 
 # %%
-plotting.ts_acfs_dfs(gmm_states, lags=300) 
+plotting.ts_acfs_dfs(gmm_states, lags=300)
 plotting.plot_states_reports(gmm_states, options='ste')
 
 # %% [markdown]
@@ -145,7 +147,7 @@ t = stat_metrics.get_ks_2sample_test(traffic_dfs, hmm_dfs)
 # %%
 
 # %% [markdown]
-# ## RNN as classifier
+# ## RNN as a classifier
 
 # %%
 from tensorflow import keras
@@ -167,6 +169,7 @@ def get_rnn_models(train_states, window_size, loss_threshold, layers=1):
                       activation='relu',
                       input_shape=(window_size, state_numb),
                       return_sequences=True))
+        model.add(Dropout(0.2))
 
     model.add(GRU(state_numb, input_shape=(window_size, state_numb)))
     model.add(Dropout(0.2))
@@ -179,10 +182,9 @@ def get_rnn_models(train_states, window_size, loss_threshold, layers=1):
     history = model.fit(X,
                         y,
                         epochs=100,
-                        validation_split=0.2,
+                        # validation_split=0.2,
                         batch_size=20,
                         callbacks=[stop_callback])
-
     return model
 
 
@@ -197,18 +199,19 @@ rnn_models = get_rnn_models(gmm_states,
 def gener_rnn_states_with_temperature(model,
                                       orig_states,
                                       window_size,
-                                      temperatures=None):
-    import numpy as np
+                                      init_entropy=None):
 
-    if not temperatures:
+    if not init_entropy:
         # this is the place for experiments
-        init_entropy = np.mean(stat_metrics.calc_windowed_entropy_discrete(orig_states[:window_size]))
-        temperatures = [init_entropy]
-        if init_entropy < 1.7:
-            temperatures += [init_entropy - 0.2, init_entropy + 0.2]
-        else:
-            temperatures += [init_entropy - 0.4, init_entropy - 0.2]
-        print('\nSelected base temperature from init_states: {:.3f}'.format(init_entropy))
+        init_entropy = np.mean(stat_metrics.calc_windowed_entropy_discrete(orig_states[:-1]))
+    temperatures = [init_entropy]
+    if 1.2 < init_entropy <= 1.7:
+        temperatures += [init_entropy - 0.2, init_entropy + 0.2]
+    elif init_entropy > 1.7:
+        temperatures += [init_entropy - 0.4, init_entropy - 0.2]
+    else:
+        temperatures += [init_entropy + 0.4, init_entropy + 0.2]
+    print('Selected base temperature from init_states: {:.3f}'.format(init_entropy))
 
     temper_results = {}
     for temperature in temperatures:
@@ -234,7 +237,7 @@ def gener_rnn_states_with_temperature(model,
 rnn_states = gener_rnn_states_with_temperature(rnn_models,
                                                gmm_states,
                                                window_size=CONFIG.rnn_window_size,
-                                               temperatures=(1.7,))
+                                               init_entropy=1.7)
 
 # %%
 rnn_dfs = mixture_models.generate_features_from_gmm_states(gmm_models, rnn_states, scalers)
@@ -256,8 +259,33 @@ t = stat_metrics.get_ks_2sample_test(traffic_dfs, rnn_dfs)
 # ## Rolling entropies
 
 # %%
-for dfs in [traffic_dfs, hmm_dfs, rnn_dfs]:
-    plotting.entropies_dfs(dfs, smoothing=5, window=50, bar=0)
+import matplotlib.pyplot as plt
+import utils
+from cycler import cycler
+
+# %%
+utils.save_obj([traffic_dfs, hmm_dfs, rnn_dfs], CONFIG.scenario)
+
+# %%
+saved_traffic = utils.load_obj(CONFIG.scenario)
+
+# %%
+monochrome = (cycler('color', ['k']) * cycler('marker', ['', '.']) * cycler('linestyle', ['-', '--', ':', '-.']))
+plt.rc('axes', prop_cycle=monochrome)
+plt.rc('legend', loc='best')
+    
+fig, target_axes = plt.subplots(nrows=3, ncols=1, figsize=[8, 9], sharex=True)
+
+for dfs, title, target_ax in zip(saved_traffic, ['Original', 'HMM', f'RNN, hidden_layers={CONFIG.rnn_hidden_layers}'], target_axes):
+    entropies = stat_metrics.calc_smoothed_entropies_dfs(dfs, smoothing=5, window=50)
+    target_ax.plot(entropies)
+    target_ax.set_ylabel(f'Rolling entropy')
+    target_ax.set_title(title)
+    target_ax.legend(entropies.columns)
+    target_ax.grid(True)
+target_ax.set_xlabel('window #\n\na)', size=12)
+plt.subplots_adjust()
+plt.savefig(f'../figures/entropies_{CONFIG.scenario}.pdf')
 
 # %%
 

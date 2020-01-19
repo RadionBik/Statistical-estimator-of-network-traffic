@@ -12,13 +12,12 @@ from collections import defaultdict
 
 import utils
 import settings
-from stat_metrics import calc_windowed_entropy_discrete
+from stat_metrics import calc_windowed_entropy_discrete, calc_smoothed_entropies_dfs
 
 FIG_PARAMS = {'low_iat': 0.0000001,
               'high_iat': 200,
               'high_pktlen': 1500,
               'bins': 100}
-
 
 RESULT_FOLDER = f'{settings.BASE_DIR}{os.sep}figures'
 
@@ -250,7 +249,6 @@ def get_x_values_dict(traffic, logScale=False):
 
 
 def define_figure_properties_per_device(device_traffic, logScale=True):
-
     device_props = {'IAT': {}, 'pktLen': {}}
     max_value = defaultdict(dict)
     for direction in device_traffic:
@@ -398,41 +396,26 @@ def goodput_dfs(dfs, resolution='1S', save_to=None):
 
 
 def entropies_dfs(traffic_dfs,
-                  bar=True,
                   smoothing=10,
                   kde_bins=500,
                   window=50,
-                  save_to=None):
-    entrs = []
-    legends = []
-    params = []
-    plt.figure()
-    for device, direction, parameter, ser in utils.iterate_3layer_dict(traffic_dfs):
-        entropy = stat_metrics.calc_windowed_entropy_cont(traffic_dfs[device][direction][parameter], kde_bins=kde_bins,
-                                                          window=window)
-        mean_entropy = np.mean(entropy)
-        entrs.append(mean_entropy)
-        if parameter == 'pktLen':
-            parameter = 'PS'
-        params.append(direction + ', ' + parameter)
-        legends.append('{:4} | {:3} | avg={:1.2f}'.format(direction, parameter, mean_entropy))
-        ax = pd.Series(entropy).rolling(smoothing, center=True).mean().plot(grid=True)
+                  save_to=None,
+                  title=None):
 
-    ax.legend(legends)
-    ax.set_title('{} | Rolling entropy, window={}, smoothing={}'.format(device,
-                                                                        window,
-                                                                        smoothing))
-    entr_series = pd.Series(entrs, index=params)
-    if bar:
-        plt.figure()
-        ax = entr_series.plot(kind='bar', grid=True, rot=30)
-        ax.set_title('Average entropy of parameters')
-        # ax.set_xticks(legends)
+    plt.figure()
+    smoothed_entropies = calc_smoothed_entropies_dfs(traffic_dfs, smoothing, window, kde_bins)
+
+    ax = smoothed_entropies.plot(grid=True, figsize=(8, 3))
+
+    if not title:
+        title = 'Rolling entropy, window={}, smoothing={}'.format(window, smoothing)
+    ax.set_ylabel(f'Rolling entropy\n({title})')
+
     if save_to:
         plt.savefig(RESULT_FOLDER + os.sep + save_to)
     plt.show()
 
-    return entr_series
+    return smoothed_entropies
 
 
 def hist_3d(dfs, save_to=None):
