@@ -56,12 +56,14 @@ def rnn_gener_state(model: keras.Model,
         sampled = np.zeros((1, window_size, state_numb))
         for t, state in enumerate(seed_states):
             sampled[0, t, state] = 1
-        one_prediction = model.predict(sampled, verbose=0)[0]
+        one_prediction = model.predict_on_batch(sampled)[0]
 
         next_state = change_pmf_temperature(one_prediction, temperature)
         generated_states[window_size + i - 1] = next_state
         seed_states[0] = next_state
         seed_states = np.roll(seed_states, -1)
+        if i%1000 == 0:
+            logger.info(f'generated {i} states')
 
     return generated_states
 

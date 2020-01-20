@@ -58,7 +58,7 @@ class ScenarioConfig:
 
 
 # %%
-IS_SKYPE = 1
+IS_SKYPE = True
 if IS_SKYPE:
     CONFIG = ScenarioConfig(scenario='skype',
                             rnn_window_size=200,
@@ -70,8 +70,8 @@ if IS_SKYPE:
 else:
     CONFIG = ScenarioConfig(scenario='amazon',
                             rnn_window_size=50,
-                            rnn_stop_loss=0.02,
-                            rnn_hidden_layers=2,
+                            rnn_stop_loss=0.04,
+                            rnn_hidden_layers=1,
                             pcap_file='../traffic_dumps/iot_amazon_echo.pcap',
                             pcap_identifier=utils.TrafficObjects.MAC,
                             device_identifier='../addresses_to_check.txt')
@@ -183,7 +183,7 @@ def get_rnn_models(train_states, window_size, loss_threshold, layers=1):
                         y,
                         epochs=100,
                         # validation_split=0.2,
-                        batch_size=20,
+                        batch_size=16,
                         callbacks=[stop_callback])
     return model
 
@@ -231,10 +231,9 @@ def gener_rnn_states_with_temperature(model,
     print('\nBest KL divergence={:.3f} for states with temperature={:.3f}'.format(best_one['distance'],
                                                                                   best_temp))
 
-    return best_one['states']
+    return best_one['states'], best_one['distance']
 
-
-rnn_states = gener_rnn_states_with_temperature(rnn_models,
+rnn_states, distances = gener_rnn_states_with_temperature(rnn_models,
                                                gmm_states,
                                                window_size=CONFIG.rnn_window_size,
                                                init_entropy=1.7)
