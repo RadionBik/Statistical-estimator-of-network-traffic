@@ -18,8 +18,8 @@ The notebooks were converted via [Jupytext](https://github.com/mwouts/jupytext) 
 The most important notebook is `ITL_paper.py` that contains the code implementing results
 from the following paper:
  
-Bikmukhamedov R., Nadeev A., Maione G., and Striccoli D. (2020), Comparison of HMM and RNN
-models for network traffic modeling, Internet Technology Letters, *awating final approval*
+* Bikmukhamedov R., Nadeev A., Maione G., and Striccoli D. (2020), Comparison of HMM and RNN
+models for network traffic modeling, Internet Technology Letters, DOI: 10.1002/itl2.147
 
  
 ## Imitator
