@@ -164,6 +164,7 @@ def print_gmm(models, componentWeightThreshold=0.02):
 def get_gmm(df,
             n_comp=None,
             parameters=None,
+            sort_components=False,
             **kwargs):
 
     if not n_comp:
@@ -173,8 +174,7 @@ def get_gmm(df,
         comp_range = range(n_comp, n_comp + 1)
         logger.info(f'Started fitting GMM')
 
-    best_comp = 0
-    lowest_bic = np.infty
+    models = []
     for comp in comp_range:
         if kwargs:
             model = BayesianGaussianMixture(n_components=comp,
@@ -183,19 +183,22 @@ def get_gmm(df,
                                             tol=0.001,
                                             **kwargs)
         else:
-            model = GaussianMixture(n_components=comp,
-                                    covariance_type="full", )
+            model = GaussianMixture(n_components=comp, covariance_type="full")
 
-        if parameters:
-            df = df[parameters]
+        df = df[parameters] if parameters else df
+
         model.fit(df)
+        models.append(model)
 
-        bic = model.bic(df)
-        if bic < lowest_bic:
-            lowest_bic = bic
-            best_model = model
-            best_comp = comp
-    logger.info('Best BIC is with {} components'.format(best_comp))
+    best_model = min(models, key=lambda x: x.bic(df))
+    logger.info('Best BIC is with {} components'.format(best_model.n_components))
+
+    if sort_components:
+        sorted_indexes = np.linalg.norm(best_model.means_, axis=1).argsort()
+        for attr in ['means_', 'covariances_', 'weights_']:
+            setattr(best_model, attr, getattr(best_model, attr)[sorted_indexes])
+        logger.info('reassigned components numbers according to their sorted norm')
+
     return best_model
 
 

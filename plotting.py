@@ -5,6 +5,8 @@ import mixture_models
 import stat_metrics
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matplotlib._color_data as mcd
 import os
 import pandas as pd
 import numpy as np
@@ -600,3 +602,32 @@ def _find_max_parameters(traffic_dfs):
                 [max(traffic_dfs[device]['from'][parameter]), max(traffic_dfs[device]['to'][parameter])])
 
     return max_params
+
+
+def plot_gmm_components(gmm):
+    ax = plt.subplot()
+    colors = mcd.XKCD_COLORS.values()
+    for n, color in zip(range(gmm.n_components), colors):
+        if gmm.covariance_type == 'full':
+            covariances = gmm.covariances_[n][:2, :2]
+        elif gmm.covariance_type == 'tied':
+            covariances = gmm.covariances_[:2, :2]
+        elif gmm.covariance_type == 'diag':
+            covariances = np.diag(gmm.covariances_[n][:2])
+        elif gmm.covariance_type == 'spherical':
+            covariances = np.eye(gmm.means_.shape[1]) * gmm.covariances_[n]
+        v, w = np.linalg.eigh(covariances)
+        u = w[0] / np.linalg.norm(w[0])
+        angle = np.arctan2(u[1], u[0])
+        angle = 180 * angle / np.pi  # convert to degrees
+        v = 2. * np.sqrt(2.) * np.sqrt(v)
+        ell = mpl.patches.Ellipse(gmm.means_[n, :2], v[0], v[1],
+                                  180 + angle, color=color)
+        ax.text(gmm.means_[n, 0], gmm.means_[n, 1], n)
+        # ell.set_clip_box(ax.bbox)
+        ell.set_alpha(0.5)
+        ax.add_artist(ell)
+        ax.set_xlabel('1st dim')
+        ax.set_ylabel('2nd dim')
+        ax.grid()
+        # ax.set_aspect('equal', 'datalim')
