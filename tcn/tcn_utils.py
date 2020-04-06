@@ -10,16 +10,20 @@ logger = logging.getLogger(__name__)
 
 class StatesDataset(Dataset):
     def __init__(self, states: np.ndarray, window=200):
+
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
         states_tensor = torch.Tensor(states)
         # chunk vector into windows shifted by one position, autoregressive approach
         ar_states = states_tensor.unfold(0, window, 1)
+        ar_states = ar_states.to(device)
+
         self.x = ar_states[:-1]
-        self.y = ar_states[1:]
+        self.y = ar_states[1:].type(torch.LongTensor).to(device)
         self.n_states = len(set(states))
         logger.info(f'dataset: got {len(states)} states with {self.n_states} unique')
 
     def __getitem__(self, index):
-        return self.x[index], self.y[index].type(torch.LongTensor)
+        return self.x[index], self.y[index]
 
     def __len__(self):
         return self.x.shape[0]

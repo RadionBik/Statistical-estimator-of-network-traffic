@@ -16,12 +16,13 @@
 # %%
 # %load_ext autoreload
 # %autoreload 2
-
-# %%
+import numpy as np
 import sys
 
+# %%
 sys.path.append("..")
 from dataclasses import dataclass
+
 import mixture_models
 import markov_models
 import plotting
@@ -29,7 +30,6 @@ import rnn_utils
 import pcap_parser
 import utils
 import stat_metrics
-import numpy as np
 sys.path.pop()
 
 
@@ -91,6 +91,19 @@ _, _, states = next(utils.iterate_2layer_dict(gmm_states))
 plotting.plot_gmm_components(gmm_model)
 
 # %%
+import json
+
+LOAD_JSON = True
+
+json_states = f'{CONFIG.scenario}_gmm.json'
+if not LOAD_JSON:
+    with open(json_states, 'w') as jsf:
+        json.dump(states.tolist(), jsf)
+else:
+    with open(json_states, 'r') as jsf:
+        states = np.array(json.load(jsf))
+
+# %%
 import torch.optim as optim
 from torch.utils.data import random_split
 from tqdm import tqdm
@@ -98,7 +111,7 @@ from tqdm import tqdm
 from tcn_utils import train, evaluate, StatesDataset
 from tcn_model import TCN
 
-
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 dataset = StatesDataset(states, window=CONFIG.rnn_window_size)
 
 parameters = {
@@ -121,8 +134,8 @@ train_ds, val_ds = random_split(dataset, lengths=(len(dataset) - val_num, val_nu
 
 channel_sizes = [parameters['hidden_size']] * parameters['n_levels']
 
-model = TCN(1, parameters['n_classes'], channel_sizes, parameters['kernel_size'], dropout=parameters['dropout'])
-
+model = TCN(1, parameters['n_classes'], channel_sizes, parameters['kernel_size'], dropout=parameters['dropout']).to(device)
+            
 lr = parameters['learning_rate']
 optimizer = getattr(optim, parameters['optimizer'])(model.parameters(), lr=lr)
 
