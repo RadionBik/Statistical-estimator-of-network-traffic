@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+import neptune
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data.dataloader import DataLoader
@@ -40,7 +41,7 @@ def calc_accuracy(output, target, n_classes):
     return 100. * correct / counter
 
 
-def evaluate(model, test_dataset: StatesDataset, n_classes):
+def evaluate(model, test_dataset: StatesDataset, n_classes, log=False):
     model.eval()
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -53,10 +54,13 @@ def evaluate(model, test_dataset: StatesDataset, n_classes):
             accuracy = calc_accuracy(output, test_y, n_classes)
             logger.info('Test set: Average loss: {:.8f}  |  Accuracy: {:.4f}\n'.format(
                 loss.item(), accuracy))
-            return loss.item()
+            if log:
+                neptune.log_metric('evaluation/loss', loss)
+                neptune.log_metric('evaluation/accuracy', accuracy)
+    return loss.item()
 
 
-def train(model, optimizer, train_dataset: StatesDataset, parameters):
+def train(model, optimizer, train_dataset: StatesDataset, parameters, log=False):
     model.train()
     losses = []
     accuracies = []
@@ -89,3 +93,6 @@ def train(model, optimizer, train_dataset: StatesDataset, parameters):
                         'loss {:5.8f} | accuracy {:5.4f}'.format(batch_idx,
                                                                  len(train_dataset) // parameters['batch_size'] + 1,
                                                                  avg_loss, accuracy))
+    if log:
+        neptune.log_metric('training/loss', np.mean(losses))
+        neptune.log_metric('training/accuracy', np.mean(accuracies))

@@ -104,9 +104,11 @@ else:
         states = np.array(json.load(jsf))
 
 # %%
+import torch
 import torch.optim as optim
 from torch.utils.data import random_split
 from tqdm import tqdm
+import neptune
 
 from tcn_utils import train, evaluate, StatesDataset
 from tcn_model import TCN
@@ -121,12 +123,12 @@ parameters = {
     'kernel_size': 4,
     'epochs': 300,
     'dropout': 0.0,
-    'learning_rate': 0.0005,
     'batch_size': 16,
     'optimizer': 'RMSprop',
+    'learning_rate': 0.0005,
     'grad_clip': 1.0,
-    'log_interval': 50,
     'train_val_splits': 10,
+    'log_interval': 50,
 }
 
 val_num = len(dataset) // parameters['train_val_splits']
@@ -139,9 +141,15 @@ model = TCN(1, parameters['n_classes'], channel_sizes, parameters['kernel_size']
 lr = parameters['learning_rate']
 optimizer = getattr(optim, parameters['optimizer'])(model.parameters(), lr=lr)
 
-
+LOG = 1
+if LOG:
+    neptune.init('radion/TCN')
+    neptune.create_experiment(name='basic', 
+                              params=parameters, 
+                              upload_source_files=['experiment.py', 'tcn_model.py', 'tcn_utils.py'])
+    
 for ep in tqdm(range(1, parameters['epochs'] + 1), file=sys.stdout, bar_format='{l_bar}{bar}{r_bar}\n'):
-    train(model, optimizer, train_ds, parameters)
-    evaluate(model, val_ds, parameters['n_classes'])
+    train(model, optimizer, train_ds, parameters, log=LOG)
+    evaluate(model, val_ds, parameters['n_classes'], log=LOG)
 
 # %%
