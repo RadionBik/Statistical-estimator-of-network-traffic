@@ -91,9 +91,6 @@ _, _, states = next(utils.iterate_2layer_dict(gmm_states))
 plotting.plot_gmm_components(gmm_model)
 
 # %%
-sys.path
-
-# %%
 import torch.optim as optim
 from torch.utils.data import random_split
 from tqdm import tqdm
@@ -131,7 +128,7 @@ optimizer = getattr(optim, parameters['optimizer'])(model.parameters(), lr=lr)
 
 
 for ep in tqdm(range(1, parameters['epochs'] + 1), file=sys.stdout, bar_format='{l_bar}{bar}{r_bar}\n'):
-    train(model, optimizer, train_ds, ep, parameters)
+    train(model, optimizer, train_ds, parameters)
     evaluate(model, val_ds, parameters['n_classes'])
 
 # %%

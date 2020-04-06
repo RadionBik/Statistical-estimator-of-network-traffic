@@ -25,6 +25,17 @@ class StatesDataset(Dataset):
         return self.x.shape[0]
 
 
+def calc_loss(criterion, output, target, n_classes):
+    return criterion(output.view(-1, n_classes), target.view(-1))
+
+
+def calc_accuracy(output, target, n_classes):
+    pred = output.view(-1, n_classes).data.max(1, keepdim=True)[1]
+    correct = pred.eq(target.data.view_as(pred)).cpu().sum()
+    counter = output.view(-1, n_classes).size(0)
+    return 100. * correct / counter
+
+
 def evaluate(model, test_dataset: StatesDataset, n_classes):
     model.eval()
     criterion = torch.nn.CrossEntropyLoss()
@@ -33,21 +44,18 @@ def evaluate(model, test_dataset: StatesDataset, n_classes):
         test_x, test_y = one_batch
 
         with torch.no_grad():
-            out = model(test_x.unsqueeze(1).contiguous())
-            loss = criterion(out.view(-1, n_classes), test_y.view(-1))
-            pred = out.view(-1, n_classes).data.max(1, keepdim=True)[1]
-            correct = pred.eq(test_y.data.view_as(pred)).cpu().sum()
-            counter = out.view(-1, n_classes).size(0)
+            output = model(test_x.unsqueeze(1).contiguous())
+            loss = calc_loss(criterion, output, test_y, n_classes)
+            accuracy = calc_accuracy(output, test_y, n_classes)
             logger.info('Test set: Average loss: {:.8f}  |  Accuracy: {:.4f}\n'.format(
-                loss.item(), 100. * correct / counter))
+                loss.item(), accuracy))
             return loss.item()
 
 
-def train(model, optimizer, train_dataset: StatesDataset, current_epoch, parameters):
+def train(model, optimizer, train_dataset: StatesDataset, parameters):
     model.train()
-    total_loss = 0
-    correct = 0
-    counter = 0
+    losses = []
+    accuracies = []
     criterion = torch.nn.CrossEntropyLoss()
 
     dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], drop_last=True, shuffle=True)
@@ -58,27 +66,22 @@ def train(model, optimizer, train_dataset: StatesDataset, current_epoch, paramet
         optimizer.zero_grad()
 
         input = x.unsqueeze(1).contiguous()
-        out = model(input)
-        out = out.view(-1, parameters['n_classes'])
-        loss = criterion(out, y.view(-1))
+        output = model(input)
+        loss = calc_loss(criterion, output, y, parameters['n_classes'])
 
         if parameters['grad_clip'] > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), parameters['grad_clip'])
         loss.backward()
         optimizer.step()
 
-        total_loss += loss.item()
-
-        pred = out.data.max(1, keepdim=True)[1]
-        correct += pred.eq(y.data.view_as(pred)).cpu().sum()
-        counter += out.size(0)
+        losses.append(loss.item())
+        accuracies.append(calc_accuracy(output, y, parameters['n_classes']))
 
         if batch_idx > 0 and batch_idx % parameters['log_interval'] == 0:
-            avg_loss = total_loss / parameters['log_interval']
-            logger.info('| {:5d}/{:5d} batches | loss {:5.8f} | '
-                        'accuracy {:5.4f}'.format(batch_idx,
-                                                  len(train_dataset) // parameters['batch_size'] + 1,
-                                                  avg_loss, 100. * correct / counter))
-            total_loss = 0
-            correct = 0
-            counter = 0
+            avg_loss = np.mean(losses[batch_idx - parameters['log_interval']:batch_idx])
+            accuracy = np.mean(accuracies[batch_idx - parameters['log_interval']:batch_idx])
+
+            logger.info('| {:5d}/{:5d} batches | '
+                        'loss {:5.8f} | accuracy {:5.4f}'.format(batch_idx,
+                                                                 len(train_dataset) // parameters['batch_size'] + 1,
+                                                                 avg_loss, accuracy))
