@@ -10,12 +10,11 @@ logger = logging.getLogger(__name__)
 
 
 class StatesDataset(Dataset):
-    def __init__(self, states: np.ndarray, window=200):
-
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    def __init__(self, states: np.ndarray, window=200, device='cpu'):
+        self.window_size = window
         states_tensor = torch.Tensor(states)
         # chunk vector into windows shifted by one position, autoregressive approach
-        ar_states = states_tensor.unfold(0, window, 1)
+        ar_states = states_tensor.unfold(0, self.window_size, 1)
         ar_states = ar_states.to(device)
 
         self.x = ar_states[:-1]
@@ -41,7 +40,7 @@ def calc_accuracy(output, target, n_classes):
     return 100. * correct / counter
 
 
-def evaluate(model, test_dataset: StatesDataset, n_classes, log=False):
+def validate(model, test_dataset: StatesDataset, n_classes, log=False):
     model.eval()
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -66,7 +65,7 @@ def train(model, optimizer, train_dataset: StatesDataset, parameters, log=False)
     accuracies = []
     criterion = torch.nn.CrossEntropyLoss()
 
-    dataloader = DataLoader(train_dataset, batch_size=parameters['batch_size'], drop_last=True, shuffle=True)
+    dataloader = DataLoader(train_dataset, batch_size=parameters.batch_size, drop_last=True, shuffle=True)
 
     for batch_idx, data_batch in enumerate(dataloader):
         x, y = data_batch
@@ -75,24 +74,48 @@ def train(model, optimizer, train_dataset: StatesDataset, parameters, log=False)
 
         input = x.unsqueeze(1).contiguous()
         output = model(input)
-        loss = calc_loss(criterion, output, y, parameters['n_classes'])
+        loss = calc_loss(criterion, output, y, parameters.n_classes)
 
-        if parameters['grad_clip'] > 0:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), parameters['grad_clip'])
+        if parameters.grad_clip > 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), parameters.grad_clip)
         loss.backward()
         optimizer.step()
 
         losses.append(loss.item())
-        accuracies.append(calc_accuracy(output, y, parameters['n_classes']))
+        accuracies.append(calc_accuracy(output, y, parameters.n_classes))
 
-        if batch_idx > 0 and batch_idx % parameters['log_interval'] == 0:
-            avg_loss = np.mean(losses[batch_idx - parameters['log_interval']:batch_idx])
-            accuracy = np.mean(accuracies[batch_idx - parameters['log_interval']:batch_idx])
+        if batch_idx > 0 and batch_idx % parameters.log_interval == 0:
+            avg_loss = np.mean(losses[batch_idx - parameters.log_interval:batch_idx])
+            accuracy = np.mean(accuracies[batch_idx - parameters.log_interval:batch_idx])
 
             logger.info('| {:5d}/{:5d} batches | '
                         'loss {:5.8f} | accuracy {:5.4f}'.format(batch_idx,
-                                                                 len(train_dataset) // parameters['batch_size'] + 1,
+                                                                 len(train_dataset) // parameters.batch_size + 1,
                                                                  avg_loss, accuracy))
     if log:
         neptune.log_metric('training/loss', np.mean(losses))
         neptune.log_metric('training/accuracy', np.mean(accuracies))
+
+
+def generate_states(model, dataset, sample_number=None):
+    def _get_next_prediction():
+        with torch.no_grad():
+            out = model(input_seq.unsqueeze(1))
+            max_out = out.squeeze(0).max(1, keepdim=True)[1]
+            return max_out[-1].unsqueeze(1)
+
+    model.eval()
+
+    input_seq, _ = next(iter(DataLoader(dataset, batch_size=1, drop_last=True, shuffle=False)))
+    window_size = input_seq.shape[1]
+    if not sample_number:
+        sample_number = len(dataset)
+
+    generated_samples = torch.zeros(sample_number + window_size)
+    generated_samples[:window_size] = input_seq[0, :]
+    for iteration in range(sample_number):
+        next_sample = _get_next_prediction()
+        input_seq = input_seq.roll(-1)
+        input_seq[0, -1] = next_sample
+        generated_samples[window_size + iteration] = next_sample
+    return generated_samples.type(torch.LongTensor)
