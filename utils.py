@@ -1,18 +1,17 @@
+import cProfile
+import functools
+import logging
 import pickle
 import re
 import socket
-import functools
-
 from collections import defaultdict
 from enum import Enum
 
 import pandas as pd
 from dpkt.compat import compat_ord
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-import cProfile
-import logging
-import settings
 
+import settings
 
 logger = logging.getLogger(__name__)
 

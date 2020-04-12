@@ -99,7 +99,7 @@ if not useTrainedGMM:
 else:
     gmm_models = utils.load_obj(f'{CONFIG.scenario}_gmm')
 
-gmm_states = rnn_utils.get_mixture_state_predictions(gmm_models, norm_traffic)
+gmm_states = mixture_models.get_mixture_state_predictions(gmm_models, norm_traffic)
 
 # %%
 

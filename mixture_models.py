@@ -12,6 +12,7 @@ import random
 import logging
 from collections import defaultdict
 import settings
+from utils import unpack_2layer_traffic_dict
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +123,7 @@ def get_KDE_values(kde_estimators, x_values):
                         np.array(x_values[device][direction][parameter]).reshape(-1, 1)))
                 elif isinstance(estimator, scipy.stats.kde.gaussian_kde):
 
-                    kde_values[device][direction][parameter] = estimator.evaluate(
+                    kde_values[device][direction][parameter] = estimator.validate(
                         x_values[device][direction][parameter])
                 else:
                     print('KDE: omitting {} {} {} for plotting'.format(direction, device, parameter))
@@ -358,3 +359,8 @@ def get_traffic_estimations(extracted_traffic, component_numb, min_samples_to_es
     logger.info('Finished estimating the traffic')
 
     return estimated_parameter_em, kde_estimators
+
+
+@unpack_2layer_traffic_dict
+def get_mixture_state_predictions(mixture_model, traffic_df):
+    return mixture_model.predict(traffic_df)

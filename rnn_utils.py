@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from tensorflow import keras
-from utils import unpack_2layer_traffic_dict
-
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +17,6 @@ class StopAtLossValue(keras.callbacks.Callback):
             logs = {}
         if logs.get('loss') <= self.threshold:
             self.model.stop_training = True
-
-
-@unpack_2layer_traffic_dict
-def get_mixture_state_predictions(mixture_model, traffic_df):
-    return mixture_model.predict(traffic_df)
 
 
 def change_pmf_temperature(preds, temperature=1.0):

@@ -14,7 +14,9 @@ def get_KL_divergence_pmf(orig_values, gen_values, state_numb=None):
     return scipy.stats.entropy(pmf_orig, pmf_gen)
 
 
-def get_KL_divergence_pdf(orig_values, gen_values, x_values):
+def get_KL_divergence_pdf(orig_values, gen_values):
+
+    x_values = np.linspace(0, max(orig_values), 100)
     kde_orig = scipy.stats.gaussian_kde(orig_values)
     kde_gen = scipy.stats.gaussian_kde(gen_values)
     return scipy.stats.entropy(pd.Series(kde_orig(x_values)), pd.Series(kde_gen(x_values)))
@@ -35,8 +37,7 @@ def get_KL_divergence(orig_dfs, gen_dfs):
         for parameter in parameters:
             orig_values = orig_dfs[device][direction][parameter].iloc[:min_len]
             gen_values = gen_dfs[device][direction][parameter].iloc[:min_len]
-            x_values = np.linspace(0, max(orig_values), 100)
-            distance = get_KL_divergence_pdf(orig_values, gen_values, x_values)
+            distance = get_KL_divergence_pdf(orig_values, gen_values)
 
             KL_distances[device][direction].update({parameter: distance})
 
