@@ -25,7 +25,7 @@ import dataclasses
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, 
-                    out=sys.stdout,
+                    stream=sys.stdout,
                     format= '[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
                     datefmt='%H:%M:%S')
 
@@ -47,11 +47,11 @@ class ExperimentConfig:
     pcap_file: str = '../traffic_dumps/skypeLANhome.pcap'
     pcap_traffic_kind: utils.TrafficObjects = utils.TrafficObjects.FLOW
     scenario: str = 'skype'
-    windows_size: int = 200
+    window_size: int = 200
     traffic_direction: str = ''
     hidden_size: int = -1
     n_classes: int = -1
-    n_levels: int = 7
+    n_levels: int = 6
     kernel_size: int = 4
     epochs: int = 300
     dropout: float = 0.0
@@ -61,6 +61,7 @@ class ExperimentConfig:
     grad_clip: float = 1.0
     train_val_splits: int = 10
     log_interval: int = 50
+    sort_components: bool = True
 
 
 CONFIG = ExperimentConfig()
@@ -75,7 +76,7 @@ norm_traffic, scalers = utils.normalize_dfs(traffic_dfs, std_scaler=False)
 
 useTrainedGMM = 1
 if not useTrainedGMM:
-    gmm_models = mixture_models.get_gmm(norm_traffic, sort_components=True)
+    gmm_models = mixture_models.get_gmm(norm_traffic, sort_components=CONFIG.sort_components)
     utils.save_obj(gmm_models, f'{CONFIG.scenario}_gmm')
 else:
     gmm_models = utils.load_obj(f'{CONFIG.scenario}_gmm')
@@ -117,7 +118,7 @@ from tcn_utils import train, validate, StatesDataset, generate_states
 from tcn_model import TCN
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-dataset = StatesDataset(states, window=200, device=device)
+dataset = StatesDataset(states, window=CONFIG.window_size, device=device)
 CONFIG.hidden_size = dataset.n_states
 CONFIG.n_classes = dataset.n_states
 
