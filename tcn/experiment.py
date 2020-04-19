@@ -24,10 +24,9 @@ import numpy as np
 import dataclasses
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, 
+logging.basicConfig(level=logging.INFO,
                     stream=sys.stdout,
-                    format= '[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
-                    datefmt='%H:%M:%S')
+                    format='%(asctime)s %(name)s:%(lineno)d %(levelname)s - %(message)s')
 
 # %%
 sys.path.append("..")
@@ -47,7 +46,7 @@ class ExperimentConfig:
     pcap_file: str = '../traffic_dumps/skypeLANhome.pcap'
     pcap_traffic_kind: utils.TrafficObjects = utils.TrafficObjects.FLOW
     scenario: str = 'skype'
-    window_size: int = 200
+    window_size: int = 120
     traffic_direction: str = ''
     hidden_size: int = -1
     n_classes: int = -1
@@ -114,7 +113,7 @@ from torch.utils.data import random_split
 from tqdm import tqdm
 import neptune
 
-from tcn_utils import train, validate, StatesDataset, generate_states
+from tcn_utils import train, validate, StatesDataset, generate_states, evaluate_KL_distance
 from tcn_model import TCN
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -147,6 +146,8 @@ if NEPTUNE_LOG:
 for _ in tqdm(range(1, CONFIG.epochs + 1), file=sys.stdout, bar_format='{l_bar}{bar}{r_bar}\n'):
     train(model, optimizer, train_ds, CONFIG, log=NEPTUNE_LOG)
     validate(model, val_ds, CONFIG.n_classes, log=NEPTUNE_LOG)
+    tcn_states = generate_states(model, dataset, sample_number=1000, shuffle=True, device=device, prepend_init_states=False)
+    evaluate_KL_distance(tcn_states, states, log=NEPTUNE_LOG)
 
 model_path = 'tcn.model'
 torch.save(model.state_dict(), model_path)
