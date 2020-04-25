@@ -1,18 +1,17 @@
+import logging
+import random
+from collections import defaultdict
+
 import numpy as np
 import pandas as pd
+import scipy
+import sklearn
 from sklearn import mixture
 from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 from sklearn.model_selection import GridSearchCV
 from sklearn.neighbors import KernelDensity
 
 import utils
-import sklearn
-import scipy
-import random
-import logging
-from collections import defaultdict
-import settings
-from utils import unpack_2layer_traffic_dict
 
 logger = logging.getLogger(__name__)
 
@@ -182,9 +181,12 @@ def get_gmm(df,
                                             covariance_type="full",
                                             max_iter=500,
                                             tol=0.001,
+                                            random_state=88,
                                             **kwargs)
         else:
-            model = GaussianMixture(n_components=comp, covariance_type="full")
+            model = GaussianMixture(n_components=comp,
+                                    covariance_type="full",
+                                    random_state=88)
 
         df = df[parameters] if parameters else df
 
@@ -361,6 +363,6 @@ def get_traffic_estimations(extracted_traffic, component_numb, min_samples_to_es
     return estimated_parameter_em, kde_estimators
 
 
-@unpack_2layer_traffic_dict
+@utils.unpack_2layer_traffic_dict
 def get_mixture_state_predictions(mixture_model, traffic_df):
     return mixture_model.predict(traffic_df)

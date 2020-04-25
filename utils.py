@@ -227,16 +227,21 @@ def save_obj(obj, name):
     """
     save_obj() saves python object to the file inside 'obj' directory
     """
-    with open(f'{settings.BASE_DIR}/obj/{name}.pkl', 'wb') as f:
+    dest_path = f'{settings.BASE_DIR}/obj/{name}.pkl'
+    with open(dest_path, 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+    logger.info(f'pickled obj to {dest_path}')
 
 
 def load_obj(name):
     """
     load_obj() loads python object from the file inside 'obj' directory
     """
-    with open(f'{settings.BASE_DIR}/obj/{name}.pkl', 'rb') as f:
-        return pickle.load(f)
+    load_path = f'{settings.BASE_DIR}/obj/{name}.pkl'
+    with open(load_path, 'rb') as f:
+        obj = pickle.load(f)
+        logger.info(f'loaded obj from {load_path}')
+        return obj
 
 
 class TrafficObjects(Enum):
