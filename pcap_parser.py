@@ -14,29 +14,6 @@ import settings
 logger = logging.getLogger(__name__)
 
 
-def get_voip_flow_list(pcapfile):
-    pipe = Popen(["./bin/ndpi_arch", "-i", pcapfile, "-v2"], stdout=PIPE)
-    raw = pipe.communicate()[0].decode("utf-8")
-
-    reg = re.compile(
-        r'(UDP) (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{1,5}) <?->? (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{1,5}) '
-        r'\[proto: [\d+\.]*\d+\/(RTP|Skype.SkypeCall)*\]')
-
-    flows = []
-
-    for transp_proto, ip1, port1, ip2, port2, app_proto in re.findall(reg, raw):
-        flows.append(transp_proto + ' ' + ip1 + ':' + port1 + ' ' + ip2 + ':' + port2)
-
-    if flows:
-        logger.info('Detected the following VoIP flows:')
-        for flow in flows:
-            logger.info(flow)
-    else:
-        exit('No VoIP flows detected')
-
-    return flows
-
-
 def _get_flow_list(pcapfile):
     logger.info('Extracting flow identifiers from {}...'.format(pcapfile))
     keys = []
@@ -346,12 +323,13 @@ def _get_address_list(file, type_ident: utils.TrafficObjects):
 
 def get_traffic_features(pcapfile: str,
                          type_of_identifier: utils.TrafficObjects,
-                         file_with_identifiers: str = None,
+                         identifiers: list = None,
                          percentiles: Tuple[int, int] = None,
                          min_samples_to_estimate: int = None):
-    identifiers = _get_address_list(file_with_identifiers, type_of_identifier)
     if type_of_identifier is utils.TrafficObjects.FLOW:
-        extracted_traffic = _extract_flow_stats(pcapfile, identifiers, min_samples_to_estimate)
+        extracted_traffic = _extract_flow_stats(pcapfile,
+                                                flows=identifiers,
+                                                min_samples_to_estimate=min_samples_to_estimate)
     elif type_of_identifier is utils.TrafficObjects.MAC or \
             type_of_identifier is utils.TrafficObjects.IP:
         extracted_traffic = _extract_host_stats(pcapfile,

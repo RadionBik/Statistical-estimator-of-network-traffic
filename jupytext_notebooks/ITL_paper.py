@@ -54,7 +54,7 @@ class ScenarioConfig:
     rnn_hidden_layers: int
     pcap_file: str
     pcap_identifier: utils.TrafficObjects
-    device_identifier: str = None
+    device_identifier: list = None
 
 
 # %%
@@ -74,12 +74,12 @@ else:
                             rnn_hidden_layers=1,
                             pcap_file='../traffic_dumps/iot_amazon_echo.pcap',
                             pcap_identifier=utils.TrafficObjects.MAC,
-                            device_identifier='../addresses_to_check.txt')
+                            device_identifier=['44:65:0d:56:cc:d3'])
 
 # %%
 traffic_dfs = pcap_parser.get_traffic_features(CONFIG.pcap_file,
                                                type_of_identifier=CONFIG.pcap_identifier,
-                                               file_with_identifiers=CONFIG.device_identifier,
+                                               identifiers=CONFIG.device_identifier,
                                                percentiles=(1, 99),
                                                min_samples_to_estimate=100)[0]
 

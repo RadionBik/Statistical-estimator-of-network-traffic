@@ -22,6 +22,7 @@ estimator_libs/
 *.pcap
 *.svg
 *.pdf
+*.model
 figures
 deviceStat.ipynb
 rnn_test.ipynb
