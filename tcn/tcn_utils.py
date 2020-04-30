@@ -149,3 +149,7 @@ def evaluate_KL_distance(generated_states, orig_states, log):
         neptune.log_metric('training/KL_divergence', distance)
     logger.info(f'KL distance is: {distance}')
     return distance
+
+
+def get_model_size(model):
+    return sum(p.numel() for p in model.parameters())
