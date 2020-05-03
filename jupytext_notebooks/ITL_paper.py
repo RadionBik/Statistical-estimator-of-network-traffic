@@ -97,7 +97,7 @@ if not useTrainedGMM:
     gmm_models = mixture_models.get_gmm(norm_traffic)
     utils.save_obj(gmm_models, f'{CONFIG.scenario}_gmm')
 else:
-    gmm_models = utils.load_obj(f'{CONFIG.scenario}_gmm')
+    gmm_models, _ = utils.load_obj(f'{CONFIG.scenario}_gmm')
 
 gmm_states = mixture_models.get_mixture_state_predictions(gmm_models, norm_traffic)
 
@@ -270,7 +270,7 @@ from cycler import cycler
 utils.save_obj([traffic_dfs, hmm_dfs, rnn_dfs], CONFIG.scenario)
 
 # %%
-saved_traffic = utils.load_obj(CONFIG.scenario)
+saved_traffic, _ = utils.load_obj(CONFIG.scenario)
 
 # %%
 monochrome = (cycler('color', ['k']) * cycler('marker', ['', '.']) * cycler('linestyle', ['-', '--', ':', '-.']))

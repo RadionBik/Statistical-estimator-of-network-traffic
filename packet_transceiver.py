@@ -304,7 +304,7 @@ def main():
 
     # load list [estimatedParameterEM, trafficExtremeValues] from the object file
     estimationsFileName = args.object.split('/')[len(args.object.split('/')) - 1].split('.')[0]
-    trafficParameters = utils.load_obj(estimationsFileName)
+    trafficParameters, _ = utils.load_obj(estimationsFileName)
 
     if args.m == 'remote':
         sync_remote(args.destination)
