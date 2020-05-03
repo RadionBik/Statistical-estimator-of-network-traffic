@@ -16,12 +16,12 @@
 # %%
 # %load_ext autoreload
 # %autoreload 2
-import json
 import logging
 import sys
 from pprint import pprint
 
 import numpy as np
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,

@@ -106,29 +106,49 @@ def freq_limited_window_estimation(spectrum_values, freqs, low_freq=None, high_f
     return int(1 / top_freq)
 
 
-def plot_report(states, axes, **filter_freqs):
+def freq_bounded_window_estimation(spectrum_values, freqs, low_freq=None, high_freq=None) -> int:
+    spectr_index_map = sorted({index: spectr for index, spectr in enumerate(spectrum_values)}.items(),
+                              key=lambda x: x[1], reverse=True)
+
+    print(spectrum_values, freqs)
+    for m_index, m_spectr in spectr_index_map:
+        if low_freq < freqs[m_index] < high_freq:
+            break
+
+    return int(1 / freqs[m_index])
+
+
+def plot_report(states, axes=None, save_to=None, **filter_freqs):
     # spectr, freqs = calc_amplitude_spectrum(states)
+    if axes is None:
+        fig, axes = plt.subplots(ncols=2, nrows=1, figsize=(12, 4))
+
+    # if filter_freqs:
+    #     states = filter_states(states, **filter_freqs)
     freqs, spectr = signal.periodogram(states, scaling='spectrum')
-    estimated_window = freq_limited_window_estimation(spectr, freqs, **filter_freqs)
+    estimated_window = freq_bounded_window_estimation(spectr, freqs, **filter_freqs)
     plot_spectrum(axes[0], spectr, freqs, estimated_window, **filter_freqs)
     plot_acf(axes[1], states, estimated_window * 3, estimated_window)
+    if save_to:
+        plt.tight_layout()
+        plt.savefig(save_to)
+    return estimated_window
 
 
-for json_states in [
-    'gmm_skype_to.json',
-    'gmm_skype_from.json',
-    'gmm_amazon_to.json',
-    'gmm_amazon_from.json',
-]:
-    states = load_states(json_states)
+if __name__ == '__main__':
+    for json_states in [
+        'gmm_skype_to.json',
+        'gmm_skype_from.json',
+        'gmm_amazon_to.json',
+        'gmm_amazon_from.json',
+    ]:
+        states = load_states(json_states)
 
-    fig, axes = plt.subplots(ncols=2, nrows=1, figsize=(15, 5))
+        fig, axes = plt.subplots(ncols=2, nrows=1, figsize=(15, 5))
 
-    # plot_report(states, orig_axes)
+        low_freq = 1 / 512
+        high_freq = None
+        # states = filter_states(states, low_freq, high_freq)
 
-    low_freq = 1 / 512
-    high_freq = None
-    # states = filter_states(states, low_freq, high_freq)
-
-    plot_report(states, axes, low_freq=low_freq, high_freq=high_freq)
-    plt.show()
+        plot_report(states, axes, low_freq=low_freq, high_freq=high_freq)
+        plt.show()
