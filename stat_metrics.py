@@ -1,7 +1,8 @@
-import utils
-import scipy
-import pandas as pd
 import numpy as np
+import pandas as pd
+import scipy
+
+import utils
 
 
 def get_KL_divergence_pmf(orig_values, gen_values, state_numb=None):
@@ -134,7 +135,7 @@ def calc_windowed_entropy_discrete(series, window=50):
     return pd.Series(windowed_entropy)
 
 
-def calc_windowed_entropy_cont(series, window=50, kde_bins=1500):
+def calc_windowed_entropy_cont(series, window=50, kde_bins=500):
     if not isinstance(series, pd.Series):
         series = pd.Series(series)
 

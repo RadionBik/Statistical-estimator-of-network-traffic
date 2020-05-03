@@ -335,7 +335,7 @@ def features_acf_dfs(dfs, lags=500, save_to=None):
     plot_counter = 0
     for device, direction, df in utils.iterate_2layer_dict_copy(dfs):
         df.index = [i for i in range(df.shape[0])]
-        df['pktLen'].plot(ax=ax[plot_counter, 0], grid=1)
+        df['pktLen'].plot(ax=ax[plot_counter, 0], grid=1, style='.', alpha=0.5)
         ax[plot_counter, 0].yaxis.set_label_text('PS, bytes')
         ax[plot_counter, 0].set_title('{} {}'.format(direction, device))
 
@@ -345,7 +345,7 @@ def features_acf_dfs(dfs, lags=500, save_to=None):
         ax[plot_counter, 1].xaxis.set_label_text('Lag')
 
         # smt.graphics.plot_acf(df['pktLen'], lags=lags, ax=axes[1])
-        df['IAT'].plot(ax=ax[plot_counter + 1, 0], grid=1)
+        df['IAT'].plot(ax=ax[plot_counter + 1, 0], grid=1, style='.', alpha=0.5)
         ax[plot_counter + 1, 0].yaxis.set_label_text('IAT, s')
 
         pd.Series([df['IAT'].autocorr(lag)
@@ -544,13 +544,16 @@ def df_analysis_plot(df, lags=100):
         ts_analysis_plot(df[parameter], lags=lags)
 
 
-def plot_states(states, state_numb=None, figsize=(12, 5)):
+def plot_states(states, state_numb=None, figsize=(12, 5), save_to=None):
     if not state_numb:
         state_numb = len(set(states))
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=figsize)
     pd.Series(states).hist(bins=state_numb, ax=axes[0])
     pd.Series(states).plot(style='.', ax=axes[1])
     plt.show()
+    if save_to:
+        plt.tight_layout()
+        plt.savefig(save_to)
 
 
 def plot_series_and_ma(series, ma_window=None, center=True):

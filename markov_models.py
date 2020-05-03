@@ -54,7 +54,7 @@ def gener_hmm_states(models, orig_dfs=None):
             sample_numb = len(orig_dfs[device][direction])
         else:
             sample_numb = 500
-        states[device][direction] = models[device][direction].sample(sample_numb)[1]
+        states[device][direction] = models[device][direction].sample(sample_numb, random_state=88)[1]
 
     return states
 
@@ -169,7 +169,8 @@ def get_hmm_from_gmm_estimate_transitions(gmm, df):
     model = hmm.GaussianHMM(n_components=gmm.n_components,
                             covariance_type="full",
                             params="t",
-                            init_params="t")
+                            init_params="t",
+                            random_state=88)
 
     model.startprob_ = gmm.weights_
     model.means_ = gmm.means_
