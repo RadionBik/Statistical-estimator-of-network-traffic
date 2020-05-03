@@ -1,15 +1,9 @@
 import logging
-import sys
 
 import numpy as np
-import neptune
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data.dataloader import DataLoader
-
-sys.path.append('..')
-import stat_metrics
-
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +32,7 @@ class StatesDataset(Dataset):
         return self.x.shape[0]
 
 
-def generate_states(model, dataset, sample_number=None, shuffle=False, prepend_init_states=True, device='cpu'):
+def generate_states(model, dataset, sample_number, window_size, shuffle=False, prepend_init_states=True, device='cpu'):
     def _get_next_prediction():
         with torch.no_grad():
             out = model(input_seq.unsqueeze(1))
@@ -48,10 +42,6 @@ def generate_states(model, dataset, sample_number=None, shuffle=False, prepend_i
     model.eval()
 
     input_seq, _ = next(iter(DataLoader(dataset, batch_size=1, drop_last=True, shuffle=shuffle)))
-    window_size = dataset.window_size
-    if not sample_number:
-        # match len with original states
-        sample_number = dataset.len_init_states
 
     init_index = 0
     generated_samples = torch.zeros(sample_number,
@@ -75,3 +65,9 @@ def generate_states(model, dataset, sample_number=None, shuffle=False, prepend_i
 
 def get_model_size(model):
     return sum(p.numel() for p in model.parameters())
+
+
+def get_eff_memory(filter_size, n_layers):
+    final_dilation_factor = 2**(n_layers - 1)
+    last_layer_memory = (filter_size - 1) * final_dilation_factor
+    return last_layer_memory
