@@ -297,3 +297,14 @@ def normalize_dfs(df, scaler=None, parameters=None, std_scaler=False):
     norm_traffic = pd.DataFrame(transformed, columns=df.columns)
 
     return norm_traffic, scaler
+
+
+def split_train_test_dfs(traffic_dfs, test_size):
+    train_dfs = construct_dict_2_layers(traffic_dfs)
+    test_dfs = construct_dict_2_layers(traffic_dfs)
+    for dev, direction, dfs in iterate_2layer_dict(traffic_dfs):
+        split_index = int(len(dfs) * (1 - test_size))
+        train_dfs[dev][direction] = dfs.iloc[:split_index]
+        test_dfs[dev][direction] = dfs.iloc[split_index:]
+
+    return train_dfs, test_dfs

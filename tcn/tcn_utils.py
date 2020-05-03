@@ -21,9 +21,8 @@ class StatesDataset(Dataset):
 
         self.x = ar_states[:-1]
         self.y = ar_states[1:].to(dtype=torch.long)
-        self.n_states = len(set(states))
         self.len_init_states = len(states)
-        logger.info(f'dataset: got {len(states)} states with {self.n_states} unique')
+        logger.info(f'dataset: got {len(states)} states with {len(set(states))} unique')
 
     def __getitem__(self, index):
         return self.x[index], self.y[index]
