@@ -129,7 +129,9 @@ plotting.plot_states_reports(gmm_states, options='ste')
 hmm_models_fit = utils.unpack_2layer_traffic_dict(markov_models.get_hmm_from_gmm_estimate_transitions)(gmm_models,
                                                                                                        norm_traffic)
 hmm_states = markov_models.gener_hmm_states(hmm_models_fit, traffic_dfs)
-hmm_dfs = mixture_models.generate_features_from_gmm_states(gmm_models, hmm_states, scalers)
+hmm_dfs = utils.unpack_2layer_traffic_dict(mixture_models.generate_features_from_gmm_states)(gmm_models,
+                                                                                             hmm_states,
+                                                                                             scalers)
 
 # %%
 plotting.hist_joint_dfs(hmm_dfs)
@@ -239,7 +241,9 @@ rnn_states, distances = gener_rnn_states_with_temperature(rnn_models,
                                                init_entropy=1.7)
 
 # %%
-rnn_dfs = mixture_models.generate_features_from_gmm_states(gmm_models, rnn_states, scalers)
+rnn_dfs = utils.unpack_2layer_traffic_dict(mixture_models.generate_features_from_gmm_states)(gmm_models,
+                                                                                             rnn_states,
+                                                                                             scalers)
 
 # %%
 plotting.ts_acfs_dfs(rnn_states, lags=300)

@@ -205,7 +205,7 @@ def get_gmm(df,
     return best_model
 
 
-@utils.unpack_2layer_traffic_dict
+# @utils.unpack_2layer_traffic_dict
 def generate_features_from_gmm_states(gmm_model, states, scaler=None):
     gen_samples = np.zeros((len(states), gmm_model.means_.shape[1]))
     gen_packet = np.zeros(gmm_model.means_.shape[1])
@@ -217,7 +217,7 @@ def generate_features_from_gmm_states(gmm_model, states, scaler=None):
                 var = np.sqrt(gmm_model.covariances_[state][feature, feature])
                 gen_packet[feature] = random.gauss(mean, var)
             if scaler:
-                gen_packet = scaler.inverse_transform(gen_packet)
+                gen_packet = scaler.inverse_transform(gen_packet.reshape(1, -1))[0, :]
             if gen_packet[0] > 0 and gen_packet[1] > 0:
                 positive = True
                 gen_samples[i, :] = gen_packet
