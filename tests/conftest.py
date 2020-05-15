@@ -1,5 +1,6 @@
 from collections import defaultdict
 import json
+import pickle
 
 import numpy as np
 import pytest
@@ -14,6 +15,14 @@ STATIC_DIR = settings.BASE_DIR / 'tests' / 'static'
 def load_json_states(name):
     with open(STATIC_DIR / name, 'r') as jf:
         return np.array(json.load(jf))
+
+
+@pytest.fixture()
+def gmm_model():
+    with open(STATIC_DIR/'skype_gmm.pkl', 'rb') as f:
+        model_dict = pickle.load(f)
+        item = next(iter(model_dict.values()))
+        return item['from']
 
 
 @pytest.fixture

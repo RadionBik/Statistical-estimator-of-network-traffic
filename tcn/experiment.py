@@ -39,6 +39,9 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,
                     stream=sys.stdout,
                     format='%(asctime)s %(name)s:%(lineno)d %(levelname)s - %(message)s')
+logging.getLogger('neptune.internal.channels.channels_values_sender').setLevel(logging.ERROR)
+# for key in logging.Logger.manager.loggerDict:
+#     print(key)
 
 # %% md [markdown]
 # ## Initialize parameters
@@ -70,6 +73,7 @@ traffic_dfs = pcap_parser.get_traffic_features(SCENARIO_CONFIG.pcap_file,
 # %%
 train_dfs, test_dfs = utils.split_train_test_dfs(traffic_dfs, SCENARIO_CONFIG.test_size)
 
+# %%
 plotting.features_acf_dfs(train_dfs)
 plotting.features_acf_dfs(test_dfs)
 
@@ -92,8 +96,9 @@ else:
 # %%
 train_gmm_states = mixture_models.get_mixture_state_predictions(gmm_models, train_norm_traffic)
 test_gmm_states = mixture_models.get_mixture_state_predictions(gmm_models, test_norm_traffic)
+tt = utils.unpack_2layer_traffic_dict(stat_metrics.calc_stats)(train_gmm_states, test_gmm_states)
 
-# %%
+# %% jupyter={"outputs_hidden": true}
 def plot_window_estimations(states_dict, **freqs):
     window = utils.construct_dict_2_layers(states_dict)
     fig, axes = plt.subplots(ncols=2, nrows=2, figsize=(12, 7))
@@ -105,8 +110,15 @@ def plot_window_estimations(states_dict, **freqs):
 
 LOW_FREQ, HIGH_FREQ = 1 / 512, 1/5
 
+# %%
 plot_window_estimations(train_gmm_states, low_freq=LOW_FREQ, high_freq=HIGH_FREQ)
 plot_window_estimations(test_gmm_states, low_freq=LOW_FREQ, high_freq=HIGH_FREQ)
+
+# %%
+utils.unpack_2layer_traffic_dict(plotting.plot_states)(train_gmm_states)
+
+# %%
+utils.unpack_2layer_traffic_dict(plotting.plot_states)(test_gmm_states)
 
 # %% [markdown] jupyter={"outputs_hidden": true}
 # ## HMM
@@ -114,7 +126,8 @@ plot_window_estimations(test_gmm_states, low_freq=LOW_FREQ, high_freq=HIGH_FREQ)
 # %%
 import markov_models
 
-hmm_models = utils.unpack_2layer_traffic_dict(markov_models.get_hmm_from_gmm_estimate_transitions)(gmm_models, train_norm_traffic)
+# hmm_models = utils.unpack_2layer_traffic_dict(markov_models.get_hmm_from_gmm_estimate_transitions)(gmm_models, train_norm_traffic)
+hmm_models = utils.unpack_2layer_traffic_dict(markov_models.get_hmm_from_gmm_pred_calc_transitions)(gmm_models, train_gmm_states)
 
 
 # %%
@@ -128,37 +141,35 @@ def evaluate_states(gen_states, test_states):
     
 
 test_hmm_states = markov_models.gener_hmm_states(hmm_models, test_dfs)
+test_hmm_dfs = utils.unpack_2layer_traffic_dict(mixture_models.generate_features_from_gmm_states)(gmm_models, test_hmm_states, scalers)
+
+stat_metrics.calculate_stats_dfs(test_dfs, test_hmm_dfs)
+
+# %%
 for dev, direct, st in utils.iterate_2layer_dict(test_hmm_states):
     metrics, _ = evaluate_states(st, test_gmm_states[dev][direct])
 
 # %%
-test_hmm_dfs = utils.unpack_2layer_traffic_dict(mixture_models.generate_features_from_gmm_states)(gmm_models, test_hmm_states, scalers)
-# plotting.features_acf_dfs(test_hmm_dfs)
-# plotting.hist_joint_dfs(test_hmm_dfs)
-stat_metrics.get_KL_divergence(test_hmm_dfs, test_dfs)
+plotting.features_acf_dfs(test_hmm_dfs)
+plotting.hist_joint_dfs(test_hmm_dfs)
+stat_metrics.get_KL_divergence(test_dfs, test_hmm_dfs)
 utils.unpack_2layer_traffic_dict(pd.DataFrame.describe)(test_hmm_dfs)
 
 # %% [markdown]
 # ## TCN
 
 # %%
-# for dev, direction, gmm_model in utils.iterate_2layer_dict(gmm_models):
-#     scaler = scalers[dev][direction]
-#     train_gmm_state = train_gmm_states[dev][direction]
-#     test_gmm_state = test_gmm_states[dev][direction]
-#     test_traffic_df = test_dfs[dev][direction]
+direction = 'from'
+device, _, _ = next(utils.iterate_2layer_dict(gmm_models))
 
-# plotting.plot_gmm_components(gmm_model)
-
-# %%
-_, direction, gmm_model = next(utils.iterate_2layer_dict(gmm_models))
-_, _, scaler = next(utils.iterate_2layer_dict(scalers))
-_, _, train_gmm_state = next(utils.iterate_2layer_dict(train_gmm_states))
-_, _, test_gmm_state = next(utils.iterate_2layer_dict(test_gmm_states))
-_, _, test_traffic_df = next(utils.iterate_2layer_dict(test_dfs))
+gmm_model = gmm_models[device][direction]
+scaler = scalers[device][direction]
+train_gmm_state = train_gmm_states[device][direction]
+test_gmm_state = test_gmm_states[device][direction]
+train_traffic_df = train_dfs[device][direction]
+test_traffic_df = test_dfs[device][direction]
 
 plotting.plot_gmm_components(gmm_model)
-
 
 # %% md [markdown]
 # ## Load saved GMM states
@@ -185,19 +196,19 @@ from pytorch_lightning.callbacks import EarlyStopping
 import scipy
 
 from base_model import TemporalConvNet
-from tcn_utils import StatesDataset, generate_states, get_model_size, get_eff_memory
+from tcn_utils import StatesDataset, generate_states, get_model_size, get_eff_memory, estimate_cheapest_parameters
 
 
 @dataclasses.dataclass
 class NetConfig:
-    window_size: int = 100
+    window_size: int = 25
     traffic_direction: str = ''
     hidden_size: int = -1
     n_classes: int = -1
-    n_levels: int = 6
-    kernel_size: int = 6
-    es_patience: int = 50
-    dropout: float = 0.0
+    n_levels: int = -1
+    kernel_size: int = -1
+    es_patience: int = 30
+    dropout: float = 0.00
     batch_size: int = 64
     optimizer: str = 'Adam'
     learning_rate: float = 0.01
@@ -205,28 +216,14 @@ class NetConfig:
     val_size: float = 0.1 
     model_size: int = 0
     effective_memory: int = dataclasses.field(init=False)
-    fft_loss: str = ''
+    fft_loss: str = '1D'
 
     def __post_init__(self):
         self.effective_memory = get_eff_memory(filter_size=self.kernel_size, n_layers=self.n_levels)
 
 
-NET_CONFIG = NetConfig(traffic_direction=direction,
-                       hidden_size=gmm_model.n_components,
-                       n_classes=gmm_model.n_components)
-        
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-dataset = StatesDataset(train_gmm_state, window=NET_CONFIG.window_size, device=device)
-val_num = int(len(dataset) * NET_CONFIG.val_size)
-train_dataset, val_dataset = random_split(dataset, lengths=(len(dataset) - val_num, val_num))
-
-
-pprint(NET_CONFIG)
-# %%
-# %%
 class TCN(LightningModule):
-    def __init__(self, input_size, output_size, num_channels, kernel_size, dropout):
+    def __init__(self, input_size, output_size, num_channels, kernel_size, dropout=0):
         super(TCN, self).__init__()
         self.tcn = TemporalConvNet(input_size, num_channels, kernel_size=kernel_size, dropout=dropout)
         self.linear = torch.nn.Linear(num_channels[-1], output_size)
@@ -253,6 +250,14 @@ class TCN(LightningModule):
             output_max_pool = output.max(dim=2)[0]
             return F.mse_loss(torch.rfft(output_max_pool.float(), signal_ndim=1, normalized=True),
                               torch.rfft(target.float(), signal_ndim=1, normalized=True))
+        elif NET_CONFIG.fft_loss == 'ampl_spectrum_1D':
+            output_max_pool = output.max(dim=2)[0]
+            return F.mse_loss(torch.rfft(output_max_pool.float(), signal_ndim=1, normalized=True)[:,:,0].abs(),
+                              torch.rfft(target.float(), signal_ndim=1, normalized=True)[:,:,0].abs())
+        elif NET_CONFIG.fft_loss == 'pow_spectrum_1D_l1':
+            output_max_pool = output.max(dim=2)[0]
+            return F.smooth_l1_loss(torch.rfft(output_max_pool.float(), signal_ndim=1, normalized=True)[:,:,0].pow(2),
+                                    torch.rfft(target.float(), signal_ndim=1, normalized=True)[:,:,0].pow(2))
 
     def _calc_loss(self, output, target, n_classes):
         loss = F.cross_entropy(output.view(-1, n_classes), target.view(-1))
@@ -314,8 +319,30 @@ class TCN(LightningModule):
                 }
         logs.update({'log': copy.deepcopy(logs)})
         return logs
+# %%
+WINDOW_SIZE = 46 * 3
+
+n_levels, kernel_size = estimate_cheapest_parameters(WINDOW_SIZE, gmm_model.n_components, TCN)
+
+NET_CONFIG = NetConfig(
+    window_size=WINDOW_SIZE,
+    traffic_direction=direction,
+    hidden_size=gmm_model.n_components,
+    n_classes=gmm_model.n_components,
+    kernel_size=kernel_size,
+    n_levels=n_levels,
+    fft_loss='1D'
+)
+
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+dataset = StatesDataset(train_gmm_state, window=NET_CONFIG.window_size, device=device)
+val_num = int(len(dataset) * NET_CONFIG.val_size)
+train_dataset, val_dataset = random_split(dataset, lengths=(len(dataset) - val_num, val_num))
 
 
+pprint(NET_CONFIG)
+# %%
 model = TCN(1, output_size=NET_CONFIG.n_classes,
             num_channels=[NET_CONFIG.hidden_size] * NET_CONFIG.n_levels,
             kernel_size=NET_CONFIG.kernel_size,
@@ -337,7 +364,7 @@ val_dataloader = DataLoader(val_dataset,
 
 neptune_logger = NeptuneLogger(
     api_key=settings.NEPTUNE_API_TOKEN,
-    offline_mode=True,
+    offline_mode=False,
     close_after_fit=False,
     project_name='radion/TCN',
     experiment_name='train_val?_test_metrics_fft_loss',
@@ -348,7 +375,7 @@ neptune_logger = NeptuneLogger(
 
 early_stop_callback = EarlyStopping(
     monitor='val_loss',
-    min_delta=0.00,
+    min_delta=0.005,
     patience=NET_CONFIG.es_patience,
     verbose=False,
     mode='min'
@@ -368,7 +395,6 @@ torch.save(model.state_dict(), model_path)
 neptune_logger.experiment.log_artifact(model_path)
 neptune_logger.experiment.log_artifact(gmm_model_path)
 
-
 # evaluation part
 tcn_states = generate_states(model, 
                              val_dataset,
@@ -384,20 +410,22 @@ res_metrics['states_ACF_peak'] = window_estimator.plot_report(tcn_states,
                                                               low_freq=LOW_FREQ, high_freq=HIGH_FREQ,
                                                               save_to=windows_fig)
 neptune_logger.experiment.log_artifact(windows_fig)
-res_metrics['states_KL_divergence'] = stat_metrics.get_KL_divergence_pdf(tcn_states, test_gmm_state)
+res_metrics.update(stat_metrics.calc_stats(test_gmm_state, tcn_states))
 states_fig = 'gen_states.pdf'
 st_fig = plotting.plot_states(tcn_states, state_numb=NET_CONFIG.n_classes)
 
 tcn_features = mixture_models.generate_features_from_gmm_states(gmm_model, tcn_states.numpy(), scaler)
-res_metrics['KL_IAT'] = stat_metrics.get_KL_divergence_pdf(test_traffic_df['IAT'], tcn_features['IAT'])
-res_metrics['KL_PS'] = stat_metrics.get_KL_divergence_pdf(test_traffic_df['pktLen'], tcn_features['pktLen'])
-pprint(res_metrics)
+for feature in test_traffic_df.columns:
+    feature_metrics = stat_metrics.calc_stats(test_traffic_df[feature], tcn_features[feature], prefix=feature)
+    res_metrics.update(feature_metrics)
+
 for k, v in res_metrics.items():
     neptune_logger.experiment.log_metric(k, v)
 
 neptune_logger.experiment.stop()
 # %%
 window_estimator.plot_report(tcn_states, low_freq=LOW_FREQ, high_freq=HIGH_FREQ, save_to=windows_fig)
+st_fig = plotting.plot_states(tcn_states, state_numb=NET_CONFIG.n_classes)
 # %% md [markdown]
 # ## Evaluate model
 
@@ -419,5 +447,18 @@ plotting.plot_states(test_gmm_state, state_numb=len(set(test_gmm_state)))
 # %%
 plotting.ts_analysis_plot(tcn_states[:3000], 500)
 
+
+# %%
+plotting.ts_analysis_plot(test_gmm_state, 500)
+
+# %%
+plotting.features_acf_df(tcn_features)
+
+# %%
+plotting.hist_joint_df(tcn_features)
+
+# %%
+_,_, test_hmm_state = next(utils.iterate_2layer_dict(test_hmm_states))
+_,_, test_hmm_df = next(utils.iterate_2layer_dict(test_hmm_dfs))
 
 # %%
