@@ -110,7 +110,6 @@ def freq_bounded_window_estimation(spectrum_values, freqs, low_freq=None, high_f
     spectr_index_map = sorted({index: spectr for index, spectr in enumerate(spectrum_values)}.items(),
                               key=lambda x: x[1], reverse=True)
 
-    print(spectrum_values, freqs)
     for m_index, m_spectr in spectr_index_map:
         if low_freq < freqs[m_index] < high_freq:
             break

@@ -1,11 +1,12 @@
-import utils
-from hmmlearn import hmm
-import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
-import pandas as pd
-import numpy as np
 import logging
-import settings
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from hmmlearn import hmm
+from sklearn.cluster import KMeans
+
+import utils
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +126,7 @@ def plot_hmm_transitions(models, samples, scalers=None, parameters=('pktLen', 'I
 
 
 def normalize_by_rows(matrix):
+    # normalize counts to probabilites, replacing on zeroed rows diagonal el-s with 1
     out_matrix = np.zeros(matrix.shape)
     row_len = matrix.shape[1]
     for i in range(matrix.shape[0]):
@@ -138,8 +140,6 @@ def normalize_by_rows(matrix):
 
 
 def get_transition_matrix_with_training(state_numb, state_seq):
-    found_states = list(set(state_seq))
-    print(found_states)
     N = np.zeros((state_numb, state_numb))
     states = list(range(state_numb))
     for j, state_j in enumerate(states):
@@ -148,10 +148,7 @@ def get_transition_matrix_with_training(state_numb, state_seq):
             for t in range(len(state_seq) - 1):
                 if state_seq[t] == state_j and state_seq[t + 1] == state_k:
                     N[j, k] += 1
-
-    # normalize counts to probabilites, replacing on zeroed rows diagonal el-s with 1
     trans_matrix = normalize_by_rows(N)
-    # show_transition_matrix(trans_matrix)
     return trans_matrix
 
 

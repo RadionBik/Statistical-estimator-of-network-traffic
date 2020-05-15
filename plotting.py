@@ -330,29 +330,34 @@ def defineFigureProperties(parameter, logScale, traffic=None, percentile=100):
     return fig_prop
 
 
+def features_acf_df(df, lags=500, device='', direction='', ax=None, plot_counter=0):
+    if ax is None:
+        fig, ax = plt.subplots(nrows=2, ncols=2, figsize=[14, 7])
+    df.index = [i for i in range(df.shape[0])]
+    df['pktLen'].plot(ax=ax[plot_counter, 0], grid=1, style='.', alpha=0.5)
+    ax[plot_counter, 0].yaxis.set_label_text('PS, bytes')
+    ax[plot_counter, 0].set_title('{} {}'.format(direction, device))
+
+    pd.Series([df['pktLen'].autocorr(lag)
+               for lag in range(lags)]).plot(ax=ax[plot_counter, 1], grid=1)
+    ax[plot_counter, 1].yaxis.set_label_text('ACF, PS')
+    ax[plot_counter, 1].xaxis.set_label_text('Lag')
+
+    # smt.graphics.plot_acf(df['pktLen'], lags=lags, ax=axes[1])
+    df['IAT'].plot(ax=ax[plot_counter + 1, 0], grid=1, style='.', alpha=0.5)
+    ax[plot_counter + 1, 0].yaxis.set_label_text('IAT, s')
+
+    pd.Series([df['IAT'].autocorr(lag)
+               for lag in range(lags)]).plot(ax=ax[plot_counter + 1, 1], grid=1)
+    ax[plot_counter + 1, 1].yaxis.set_label_text('ACF, IAT')
+    ax[plot_counter + 1, 1].xaxis.set_label_text('Lag')
+
+
 def features_acf_dfs(dfs, lags=500, save_to=None):
     fig, ax = plt.subplots(nrows=4, ncols=2, figsize=[14, 7])
     plot_counter = 0
     for device, direction, df in utils.iterate_2layer_dict_copy(dfs):
-        df.index = [i for i in range(df.shape[0])]
-        df['pktLen'].plot(ax=ax[plot_counter, 0], grid=1, style='.', alpha=0.5)
-        ax[plot_counter, 0].yaxis.set_label_text('PS, bytes')
-        ax[plot_counter, 0].set_title('{} {}'.format(direction, device))
-
-        pd.Series([df['pktLen'].autocorr(lag)
-                   for lag in range(lags)]).plot(ax=ax[plot_counter, 1], grid=1)
-        ax[plot_counter, 1].yaxis.set_label_text('ACF, PS')
-        ax[plot_counter, 1].xaxis.set_label_text('Lag')
-
-        # smt.graphics.plot_acf(df['pktLen'], lags=lags, ax=axes[1])
-        df['IAT'].plot(ax=ax[plot_counter + 1, 0], grid=1, style='.', alpha=0.5)
-        ax[plot_counter + 1, 0].yaxis.set_label_text('IAT, s')
-
-        pd.Series([df['IAT'].autocorr(lag)
-                   for lag in range(lags)]).plot(ax=ax[plot_counter + 1, 1], grid=1)
-        ax[plot_counter + 1, 1].yaxis.set_label_text('ACF, IAT')
-        ax[plot_counter + 1, 1].xaxis.set_label_text('Lag')
-
+        features_acf_df(df, lags, device, direction, ax, plot_counter)
         plot_counter += 2
 
     plt.tight_layout()
@@ -449,35 +454,43 @@ def hist_3d(dfs, save_to=None):
     plt.show()
 
 
+def hist_joint_df(df, device='', direction='', fig_shifter=0, fig=None):
+
+    if fig is None:
+        fig = plt.figure(figsize=(13, 6))
+
+    layout = (4, 8)
+
+    df.index = [i for i in range(df.shape[0])]
+    df.columns = ['IAT, s', 'PS, bytes']
+    x = pd.Series(df['IAT, s'], name='')
+    y = pd.Series(df['PS, bytes'], name='')
+
+    kde_x = plt.subplot2grid(layout, (0, fig_shifter), colspan=3)
+    kde_y = plt.subplot2grid(layout, (1, fig_shifter + 3), rowspan=3)
+    scatter = plt.subplot2grid(layout, (1, fig_shifter), rowspan=3, colspan=3)
+
+    sc_ax = sns.scatterplot(x='IAT, s', y='PS, bytes', data=df, ax=scatter, alpha=0.5)
+    if fig_shifter == 4:
+        sc_ax.set_ylabel('')
+    kde_x.set_xlim(sc_ax.get_xlim())
+    kde_y.set_ylim(sc_ax.get_ylim())
+    kde_x.axis('off')
+    kde_y.axis('off')
+    kde_x.set_title('{} {}'.format(direction, device))
+
+    sns.distplot(x, vertical=0, ax=kde_x)
+    sns.distplot(y, vertical=1, ax=kde_y)
+
+
 def hist_joint_dfs(dfs, save_to=None):
     fig = plt.figure(figsize=(13, 6))
-    layout = (4, 8)
     # fig.subplots_adjust(wspace=0.5)
 
     fig_shifter = 0
     for device, direction, df in utils.iterate_2layer_dict_copy(dfs):
-
         # df = df.copy()
-        df.index = [i for i in range(df.shape[0])]
-        df.columns = ['IAT, s', 'PS, bytes']
-        x = pd.Series(df['IAT, s'], name='')
-        y = pd.Series(df['PS, bytes'], name='')
-
-        kde_x = plt.subplot2grid(layout, (0, fig_shifter), colspan=3)
-        kde_y = plt.subplot2grid(layout, (1, fig_shifter + 3), rowspan=3)
-        scatter = plt.subplot2grid(layout, (1, fig_shifter), rowspan=3, colspan=3)
-
-        sc_ax = sns.scatterplot(x='IAT, s', y='PS, bytes', data=df, ax=scatter, alpha=0.5)
-        if fig_shifter == 4:
-            sc_ax.set_ylabel('')
-        kde_x.set_xlim(sc_ax.get_xlim())
-        kde_y.set_ylim(sc_ax.get_ylim())
-        kde_x.axis('off')
-        kde_y.axis('off')
-        kde_x.set_title('{} {}'.format(direction, device))
-
-        sns.distplot(x, vertical=0, ax=kde_x)
-        sns.distplot(y, vertical=1, ax=kde_y)
+        hist_joint_df(df, device, direction, fig_shifter, fig)
         fig_shifter += 4
 
     fig.tight_layout()
