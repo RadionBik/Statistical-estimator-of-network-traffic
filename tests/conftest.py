@@ -1,10 +1,33 @@
+from collections import defaultdict
+import json
+import pickle
+
+import numpy as np
 import pytest
+
 import pcap_parser as estimator
 import settings
-from collections import defaultdict
-import numpy as np
-
 import utils
+
+STATIC_DIR = settings.BASE_DIR / 'tests' / 'static'
+
+
+def load_json_states(name):
+    with open(STATIC_DIR / name, 'r') as jf:
+        return np.array(json.load(jf))
+
+
+@pytest.fixture()
+def gmm_model():
+    with open(STATIC_DIR/'skype_gmm.pkl', 'rb') as f:
+        model_dict = pickle.load(f)
+        item = next(iter(model_dict.values()))
+        return item['from']
+
+
+@pytest.fixture
+def gmm_state():
+    return load_json_states('gmm_skype_from.json')
 
 
 @pytest.fixture
@@ -19,7 +42,7 @@ def traffic_dict():
 @pytest.fixture
 def gmm_states():
     states = defaultdict(dict)
-    states['UDP 192.168.0.102:18826 192.168.0.105:26454'] = {'from': np.random.randint(0, 16, 3547),
-                                                             'to': np.random.randint(0, 16, 3625)}
+    states['UDP 192.168.0.102:18826 192.168.0.105:26454'] = {'from': load_json_states('gmm_skype_from.json'),
+                                                             'to': load_json_states('gmm_skype_to.json')}
     return states
 

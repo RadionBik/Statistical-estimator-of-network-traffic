@@ -1,18 +1,17 @@
+import cProfile
+import functools
+import logging
 import pickle
 import re
 import socket
-import functools
-
 from collections import defaultdict
 from enum import Enum
 
 import pandas as pd
 from dpkt.compat import compat_ord
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-import cProfile
-import logging
-import settings
 
+import settings
 
 logger = logging.getLogger(__name__)
 
@@ -228,16 +227,22 @@ def save_obj(obj, name):
     """
     save_obj() saves python object to the file inside 'obj' directory
     """
-    with open(f'{settings.BASE_DIR}/obj/{name}.pkl', 'wb') as f:
+    dest_path = settings.BASE_DIR / f'obj/{name}.pkl'
+    with open(dest_path, 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+    logger.info(f'pickled obj to {dest_path}')
+    return dest_path.as_posix()
 
 
 def load_obj(name):
     """
     load_obj() loads python object from the file inside 'obj' directory
     """
-    with open(f'{settings.BASE_DIR}/obj/{name}.pkl', 'rb') as f:
-        return pickle.load(f)
+    load_path = settings.BASE_DIR / f'obj/{name}.pkl'
+    with open(load_path, 'rb') as f:
+        obj = pickle.load(f)
+        logger.info(f'loaded obj from {load_path}')
+        return obj, load_path.as_posix()
 
 
 class TrafficObjects(Enum):
@@ -276,20 +281,30 @@ def get_traffic_extreme_values(traffic):
 
 
 @unpack_2layer_traffic_dict
-def normalize_dfs(df, parameters=None, std_scaler=True):
-    if std_scaler:
-        scaler = StandardScaler()
-    else:
-        scaler = MinMaxScaler()
-
+def normalize_dfs(df, scaler=None, parameters=None, std_scaler=False):
     if parameters:
         df = df[parameters]
 
     if 'pktLen' in df.columns:
-        df['pktLen'] = df['pktLen'].astype(float, copy=False)
+        df.loc[:, 'pktLen'] = df['pktLen'].astype(float, copy=False)
 
-    scaler.fit(df)
-    norm_traffic = pd.DataFrame(scaler.transform(df),
-                                columns=df.columns)
+    if not scaler:
+        scaler = StandardScaler() if std_scaler else MinMaxScaler()
+        transformed = scaler.fit_transform(df)
+    else:
+        transformed = scaler.transform(df)
+
+    norm_traffic = pd.DataFrame(transformed, columns=df.columns)
 
     return norm_traffic, scaler
+
+
+def split_train_test_dfs(traffic_dfs, test_size):
+    train_dfs = construct_dict_2_layers(traffic_dfs)
+    test_dfs = construct_dict_2_layers(traffic_dfs)
+    for dev, direction, dfs in iterate_2layer_dict(traffic_dfs):
+        split_index = int(len(dfs) * (1 - test_size))
+        train_dfs[dev][direction] = dfs.iloc[:split_index]
+        test_dfs[dev][direction] = dfs.iloc[split_index:]
+
+    return train_dfs, test_dfs

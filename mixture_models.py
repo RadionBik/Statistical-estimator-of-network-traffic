@@ -1,17 +1,17 @@
+import logging
+import random
+from collections import defaultdict
+
 import numpy as np
 import pandas as pd
+import scipy
+import sklearn
 from sklearn import mixture
 from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 from sklearn.model_selection import GridSearchCV
 from sklearn.neighbors import KernelDensity
 
 import utils
-import sklearn
-import scipy
-import random
-import logging
-from collections import defaultdict
-import settings
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ def get_KDE_values(kde_estimators, x_values):
                         np.array(x_values[device][direction][parameter]).reshape(-1, 1)))
                 elif isinstance(estimator, scipy.stats.kde.gaussian_kde):
 
-                    kde_values[device][direction][parameter] = estimator.evaluate(
+                    kde_values[device][direction][parameter] = estimator.validate(
                         x_values[device][direction][parameter])
                 else:
                     print('KDE: omitting {} {} {} for plotting'.format(direction, device, parameter))
@@ -164,6 +164,7 @@ def print_gmm(models, componentWeightThreshold=0.02):
 def get_gmm(df,
             n_comp=None,
             parameters=None,
+            sort_components=False,
             **kwargs):
 
     if not n_comp:
@@ -173,33 +174,38 @@ def get_gmm(df,
         comp_range = range(n_comp, n_comp + 1)
         logger.info(f'Started fitting GMM')
 
-    best_comp = 0
-    lowest_bic = np.infty
+    models = []
     for comp in comp_range:
         if kwargs:
             model = BayesianGaussianMixture(n_components=comp,
                                             covariance_type="full",
                                             max_iter=500,
                                             tol=0.001,
+                                            random_state=88,
                                             **kwargs)
         else:
             model = GaussianMixture(n_components=comp,
-                                    covariance_type="full", )
+                                    covariance_type="full",
+                                    random_state=88)
 
-        if parameters:
-            df = df[parameters]
+        df = df[parameters] if parameters else df
+
         model.fit(df)
+        models.append(model)
 
-        bic = model.bic(df)
-        if bic < lowest_bic:
-            lowest_bic = bic
-            best_model = model
-            best_comp = comp
-    logger.info('Best BIC is with {} components'.format(best_comp))
+    best_model = min(models, key=lambda x: x.bic(df))
+    logger.info('Best BIC is with {} components'.format(best_model.n_components))
+
+    if sort_components:
+        sorted_indexes = np.linalg.norm(best_model.means_, axis=1).argsort()
+        for attr in ['means_', 'covariances_', 'weights_']:
+            setattr(best_model, attr, getattr(best_model, attr)[sorted_indexes])
+        logger.info('reassigned components numbers according to their sorted norm')
+
     return best_model
 
 
-@utils.unpack_2layer_traffic_dict
+# @utils.unpack_2layer_traffic_dict
 def generate_features_from_gmm_states(gmm_model, states, scaler=None):
     gen_samples = np.zeros((len(states), gmm_model.means_.shape[1]))
     gen_packet = np.zeros(gmm_model.means_.shape[1])
@@ -211,7 +217,7 @@ def generate_features_from_gmm_states(gmm_model, states, scaler=None):
                 var = np.sqrt(gmm_model.covariances_[state][feature, feature])
                 gen_packet[feature] = random.gauss(mean, var)
             if scaler:
-                gen_packet = scaler.inverse_transform(gen_packet)
+                gen_packet = scaler.inverse_transform(gen_packet.reshape(1, -1))[0, :]
             if gen_packet[0] > 0 and gen_packet[1] > 0:
                 positive = True
                 gen_samples[i, :] = gen_packet
@@ -355,3 +361,8 @@ def get_traffic_estimations(extracted_traffic, component_numb, min_samples_to_es
     logger.info('Finished estimating the traffic')
 
     return estimated_parameter_em, kde_estimators
+
+
+@utils.unpack_2layer_traffic_dict
+def get_mixture_state_predictions(mixture_model, traffic_df):
+    return mixture_model.predict(traffic_df)

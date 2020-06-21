@@ -1,6 +1,8 @@
 old_figures/
 old_logs/
 voice_modeling_report/
+lightning_logs
+offline-name
 #traffic_dumps/*
 .idea/
 .directory
@@ -22,6 +24,7 @@ estimator_libs/
 *.pcap
 *.svg
 *.pdf
+*.model
 figures
 deviceStat.ipynb
 rnn_test.ipynb

@@ -8,7 +8,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.3.1
+#       jupytext_version: 1.4.1
 #   kernelspec:
 #     display_name: Python 3
 #     language: python
@@ -54,7 +54,7 @@ class ScenarioConfig:
     rnn_hidden_layers: int
     pcap_file: str
     pcap_identifier: utils.TrafficObjects
-    device_identifier: str = None
+    device_identifier: list = None
 
 
 # %%
@@ -74,12 +74,12 @@ else:
                             rnn_hidden_layers=1,
                             pcap_file='../traffic_dumps/iot_amazon_echo.pcap',
                             pcap_identifier=utils.TrafficObjects.MAC,
-                            device_identifier='../addresses_to_check.txt')
+                            device_identifier=['44:65:0d:56:cc:d3'])
 
 # %%
 traffic_dfs = pcap_parser.get_traffic_features(CONFIG.pcap_file,
                                                type_of_identifier=CONFIG.pcap_identifier,
-                                               file_with_identifiers=CONFIG.device_identifier,
+                                               identifiers=CONFIG.device_identifier,
                                                percentiles=(1, 99),
                                                min_samples_to_estimate=100)[0]
 
@@ -97,9 +97,9 @@ if not useTrainedGMM:
     gmm_models = mixture_models.get_gmm(norm_traffic)
     utils.save_obj(gmm_models, f'{CONFIG.scenario}_gmm')
 else:
-    gmm_models = utils.load_obj(f'{CONFIG.scenario}_gmm')
+    gmm_models, _ = utils.load_obj(f'{CONFIG.scenario}_gmm')
 
-gmm_states = rnn_utils.get_mixture_state_predictions(gmm_models, norm_traffic)
+gmm_states = mixture_models.get_mixture_state_predictions(gmm_models, norm_traffic)
 
 # %%
 
@@ -129,7 +129,9 @@ plotting.plot_states_reports(gmm_states, options='ste')
 hmm_models_fit = utils.unpack_2layer_traffic_dict(markov_models.get_hmm_from_gmm_estimate_transitions)(gmm_models,
                                                                                                        norm_traffic)
 hmm_states = markov_models.gener_hmm_states(hmm_models_fit, traffic_dfs)
-hmm_dfs = mixture_models.generate_features_from_gmm_states(gmm_models, hmm_states, scalers)
+hmm_dfs = utils.unpack_2layer_traffic_dict(mixture_models.generate_features_from_gmm_states)(gmm_models,
+                                                                                             hmm_states,
+                                                                                             scalers)
 
 # %%
 plotting.hist_joint_dfs(hmm_dfs)
@@ -239,7 +241,9 @@ rnn_states, distances = gener_rnn_states_with_temperature(rnn_models,
                                                init_entropy=1.7)
 
 # %%
-rnn_dfs = mixture_models.generate_features_from_gmm_states(gmm_models, rnn_states, scalers)
+rnn_dfs = utils.unpack_2layer_traffic_dict(mixture_models.generate_features_from_gmm_states)(gmm_models,
+                                                                                             rnn_states,
+                                                                                             scalers)
 
 # %%
 plotting.ts_acfs_dfs(rnn_states, lags=300)
@@ -266,7 +270,7 @@ from cycler import cycler
 utils.save_obj([traffic_dfs, hmm_dfs, rnn_dfs], CONFIG.scenario)
 
 # %%
-saved_traffic = utils.load_obj(CONFIG.scenario)
+saved_traffic, _ = utils.load_obj(CONFIG.scenario)
 
 # %%
 monochrome = (cycler('color', ['k']) * cycler('marker', ['', '.']) * cycler('linestyle', ['-', '--', ':', '-.']))

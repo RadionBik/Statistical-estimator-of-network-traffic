@@ -5,6 +5,8 @@ import mixture_models
 import stat_metrics
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matplotlib._color_data as mcd
 import os
 import pandas as pd
 import numpy as np
@@ -328,29 +330,34 @@ def defineFigureProperties(parameter, logScale, traffic=None, percentile=100):
     return fig_prop
 
 
+def features_acf_df(df, lags=500, device='', direction='', ax=None, plot_counter=0):
+    if ax is None:
+        fig, ax = plt.subplots(nrows=2, ncols=2, figsize=[14, 7])
+    df.index = [i for i in range(df.shape[0])]
+    df['pktLen'].plot(ax=ax[plot_counter, 0], grid=1, style='.', alpha=0.5)
+    ax[plot_counter, 0].yaxis.set_label_text('PS, bytes')
+    ax[plot_counter, 0].set_title('{} {}'.format(direction, device))
+
+    pd.Series([df['pktLen'].autocorr(lag)
+               for lag in range(lags)]).plot(ax=ax[plot_counter, 1], grid=1)
+    ax[plot_counter, 1].yaxis.set_label_text('ACF, PS')
+    ax[plot_counter, 1].xaxis.set_label_text('Lag')
+
+    # smt.graphics.plot_acf(df['pktLen'], lags=lags, ax=axes[1])
+    df['IAT'].plot(ax=ax[plot_counter + 1, 0], grid=1, style='.', alpha=0.5)
+    ax[plot_counter + 1, 0].yaxis.set_label_text('IAT, s')
+
+    pd.Series([df['IAT'].autocorr(lag)
+               for lag in range(lags)]).plot(ax=ax[plot_counter + 1, 1], grid=1)
+    ax[plot_counter + 1, 1].yaxis.set_label_text('ACF, IAT')
+    ax[plot_counter + 1, 1].xaxis.set_label_text('Lag')
+
+
 def features_acf_dfs(dfs, lags=500, save_to=None):
     fig, ax = plt.subplots(nrows=4, ncols=2, figsize=[14, 7])
     plot_counter = 0
     for device, direction, df in utils.iterate_2layer_dict_copy(dfs):
-        df.index = [i for i in range(df.shape[0])]
-        df['pktLen'].plot(ax=ax[plot_counter, 0], grid=1)
-        ax[plot_counter, 0].yaxis.set_label_text('PS, bytes')
-        ax[plot_counter, 0].set_title('{} {}'.format(direction, device))
-
-        pd.Series([df['pktLen'].autocorr(lag)
-                   for lag in range(lags)]).plot(ax=ax[plot_counter, 1], grid=1)
-        ax[plot_counter, 1].yaxis.set_label_text('ACF, PS')
-        ax[plot_counter, 1].xaxis.set_label_text('Lag')
-
-        # smt.graphics.plot_acf(df['pktLen'], lags=lags, ax=axes[1])
-        df['IAT'].plot(ax=ax[plot_counter + 1, 0], grid=1)
-        ax[plot_counter + 1, 0].yaxis.set_label_text('IAT, s')
-
-        pd.Series([df['IAT'].autocorr(lag)
-                   for lag in range(lags)]).plot(ax=ax[plot_counter + 1, 1], grid=1)
-        ax[plot_counter + 1, 1].yaxis.set_label_text('ACF, IAT')
-        ax[plot_counter + 1, 1].xaxis.set_label_text('Lag')
-
+        features_acf_df(df, lags, device, direction, ax, plot_counter)
         plot_counter += 2
 
     plt.tight_layout()
@@ -447,35 +454,43 @@ def hist_3d(dfs, save_to=None):
     plt.show()
 
 
+def hist_joint_df(df, device='', direction='', fig_shifter=0, fig=None):
+
+    if fig is None:
+        fig = plt.figure(figsize=(13, 6))
+
+    layout = (4, 8)
+
+    df.index = [i for i in range(df.shape[0])]
+    df.columns = ['IAT, s', 'PS, bytes']
+    x = pd.Series(df['IAT, s'], name='')
+    y = pd.Series(df['PS, bytes'], name='')
+
+    kde_x = plt.subplot2grid(layout, (0, fig_shifter), colspan=3)
+    kde_y = plt.subplot2grid(layout, (1, fig_shifter + 3), rowspan=3)
+    scatter = plt.subplot2grid(layout, (1, fig_shifter), rowspan=3, colspan=3)
+
+    sc_ax = sns.scatterplot(x='IAT, s', y='PS, bytes', data=df, ax=scatter, alpha=0.5)
+    if fig_shifter == 4:
+        sc_ax.set_ylabel('')
+    kde_x.set_xlim(sc_ax.get_xlim())
+    kde_y.set_ylim(sc_ax.get_ylim())
+    kde_x.axis('off')
+    kde_y.axis('off')
+    kde_x.set_title('{} {}'.format(direction, device))
+
+    sns.distplot(x, vertical=0, ax=kde_x)
+    sns.distplot(y, vertical=1, ax=kde_y)
+
+
 def hist_joint_dfs(dfs, save_to=None):
     fig = plt.figure(figsize=(13, 6))
-    layout = (4, 8)
     # fig.subplots_adjust(wspace=0.5)
 
     fig_shifter = 0
     for device, direction, df in utils.iterate_2layer_dict_copy(dfs):
-
         # df = df.copy()
-        df.index = [i for i in range(df.shape[0])]
-        df.columns = ['IAT, s', 'PS, bytes']
-        x = pd.Series(df['IAT, s'], name='')
-        y = pd.Series(df['PS, bytes'], name='')
-
-        kde_x = plt.subplot2grid(layout, (0, fig_shifter), colspan=3)
-        kde_y = plt.subplot2grid(layout, (1, fig_shifter + 3), rowspan=3)
-        scatter = plt.subplot2grid(layout, (1, fig_shifter), rowspan=3, colspan=3)
-
-        sc_ax = sns.scatterplot(x='IAT, s', y='PS, bytes', data=df, ax=scatter, alpha=0.5)
-        if fig_shifter == 4:
-            sc_ax.set_ylabel('')
-        kde_x.set_xlim(sc_ax.get_xlim())
-        kde_y.set_ylim(sc_ax.get_ylim())
-        kde_x.axis('off')
-        kde_y.axis('off')
-        kde_x.set_title('{} {}'.format(direction, device))
-
-        sns.distplot(x, vertical=0, ax=kde_x)
-        sns.distplot(y, vertical=1, ax=kde_y)
+        hist_joint_df(df, device, direction, fig_shifter, fig)
         fig_shifter += 4
 
     fig.tight_layout()
@@ -542,13 +557,16 @@ def df_analysis_plot(df, lags=100):
         ts_analysis_plot(df[parameter], lags=lags)
 
 
-def plot_states(states, state_numb=None, figsize=(12, 5)):
+def plot_states(states, state_numb=None, figsize=(12, 5), save_to=None):
     if not state_numb:
         state_numb = len(set(states))
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=figsize)
     pd.Series(states).hist(bins=state_numb, ax=axes[0])
     pd.Series(states).plot(style='.', ax=axes[1])
     plt.show()
+    if save_to:
+        plt.tight_layout()
+        plt.savefig(save_to)
 
 
 def plot_series_and_ma(series, ma_window=None, center=True):
@@ -600,3 +618,32 @@ def _find_max_parameters(traffic_dfs):
                 [max(traffic_dfs[device]['from'][parameter]), max(traffic_dfs[device]['to'][parameter])])
 
     return max_params
+
+
+def plot_gmm_components(gmm):
+    ax = plt.subplot()
+    colors = mcd.XKCD_COLORS.values()
+    for n, color in zip(range(gmm.n_components), colors):
+        if gmm.covariance_type == 'full':
+            covariances = gmm.covariances_[n][:2, :2]
+        elif gmm.covariance_type == 'tied':
+            covariances = gmm.covariances_[:2, :2]
+        elif gmm.covariance_type == 'diag':
+            covariances = np.diag(gmm.covariances_[n][:2])
+        elif gmm.covariance_type == 'spherical':
+            covariances = np.eye(gmm.means_.shape[1]) * gmm.covariances_[n]
+        v, w = np.linalg.eigh(covariances)
+        u = w[0] / np.linalg.norm(w[0])
+        angle = np.arctan2(u[1], u[0])
+        angle = 180 * angle / np.pi  # convert to degrees
+        v = 2. * np.sqrt(2.) * np.sqrt(v)
+        ell = mpl.patches.Ellipse(gmm.means_[n, :2], v[0], v[1],
+                                  180 + angle, color=color)
+        ax.text(gmm.means_[n, 0], gmm.means_[n, 1], n)
+        # ell.set_clip_box(ax.bbox)
+        ell.set_alpha(0.5)
+        ax.add_artist(ell)
+        ax.set_xlabel('1st dim')
+        ax.set_ylabel('2nd dim')
+        ax.grid()
+        # ax.set_aspect('equal', 'datalim')
