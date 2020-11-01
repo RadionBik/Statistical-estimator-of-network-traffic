@@ -62,22 +62,26 @@ def extract_host_stats(
         if src_id == host:
             stats['PS'].append(len(ip))
             stats['TS'].append(ts)
-            stats['is_client'].append(1)
+            stats['is_client'].append(True)
         elif dst_id == host:
             stats['PS'].append(len(ip))
             stats['TS'].append(ts)
-            stats['is_client'].append(0)
+            stats['is_client'].append(False)
 
-    ts = stats.pop('TS')
-    stats = pd.DataFrame(stats, index=ts)
+    stats = pd.DataFrame(stats)
+    iat_from = stats[stats['is_client']]['TS'].diff().fillna(0)
+    iat_to = stats[~stats['is_client']]['TS'].diff().fillna(0)
+
+    stats['IAT, sec'] = pd.concat([iat_to, iat_from]).sort_index()
     return stats
 
 
 if __name__ == '__main__':
     import settings
-
+    source_pcap = settings.BASE_DIR / 'traffic_dumps/iot_amazon_echo.pcap'
     extr_stats = extract_host_stats(
-        settings.BASE_DIR / 'traffic_dumps/iot_amazon_echo.pcap',
+        source_pcap,
         '44:65:0d:56:cc:d3',
     )
     print(extr_stats)
+    extr_stats.to_csv(source_pcap.as_posix() + '.csv')
