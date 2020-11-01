@@ -34,9 +34,9 @@ class StatesDataset(Dataset):
 def generate_states(model, dataset, sample_number, window_size, shuffle=False, prepend_init_states=True, device='cpu'):
     def _get_next_prediction():
         with torch.no_grad():
-            out = model(input_seq.unsqueeze(1))
-            max_out = out.squeeze(0).max(1, keepdim=True)[1]
-            return max_out[-1].unsqueeze(1)
+            out = model(input_seq)
+            sampled = out.squeeze(0).max(1, keepdim=True)[1]
+            return sampled[-1].unsqueeze(1)
 
     model.eval()
 
