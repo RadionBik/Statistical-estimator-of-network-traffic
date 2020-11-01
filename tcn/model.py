@@ -21,7 +21,7 @@ class TCNGenerator(LightningModule):
                                    config.num_channels,
                                    kernel_size=config.kernel_size,
                                    dropout=config.dropout)
-        self.linear = torch.nn.Linear(config.num_channels[-1], config.output_size)
+        self.linear = torch.nn.Linear(config.num_channels[-1], config.n_classes)
         self.init_weights()
         self.config = config
 
