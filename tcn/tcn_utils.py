@@ -11,10 +11,11 @@ logger = logging.getLogger(__name__)
 class StatesDataset(Dataset):
     def __init__(self, states: np.ndarray, window=200, device='cpu'):
         self.window_size = window
-        states_tensor = torch.as_tensor(states,
-                                        dtype=torch.float,
-                                        device=device,
-                                        )
+        states_tensor = torch.as_tensor(
+            states,
+            dtype=torch.float,
+            device=device
+        )
         # chunk vector into windows shifted by one position, autoregressive approach
         ar_states = states_tensor.unfold(0, self.window_size, 1)
         ar_states = ar_states
@@ -31,22 +32,17 @@ class StatesDataset(Dataset):
         return self.x.shape[0]
 
 
-def generate_states(model, dataset, sample_number, window_size, shuffle=False, prepend_init_states=True, device='cpu'):
+def generate_states(model, sample_number, window_size, device='cpu'):
     model.eval()
 
-    input_seq, _ = next(iter(DataLoader(dataset, batch_size=1, drop_last=True, shuffle=shuffle)))
+    start_seq = get_init_seq(window_size)
+    input_seq = torch.tensor(start_seq, dtype=torch.float).unsqueeze(0)
 
     init_index = 0
     generated_samples = torch.zeros(sample_number,
                                     device=device,
                                     dtype=torch.long)
-    logger.debug(f'starting generating with sample_number={sample_number}, '
-                 f'prepend_init_states={prepend_init_states}')
-
-    if prepend_init_states:
-        sample_number -= window_size
-        init_index += window_size
-        generated_samples[:window_size] = input_seq[0, :]
+    logger.debug(f'starting generating with sample_number={sample_number}')
 
     for iteration in range(sample_number):
         next_sample = model.get_next_prediction(input_seq)
@@ -84,3 +80,11 @@ def estimate_cheapest_parameters(estimated_data_window, n_classes, tcn_model_cla
     (n_levels, kernel_size), param_number = sorted(min_params_pair.items(), key=lambda x: x[1])[0]
     print(f'selected pair with {param_number} params: layers={n_levels}, kernel={kernel_size}')
     return n_levels, kernel_size
+
+
+def get_init_seq(window_size, pad_token=0, start_token=1):
+    # [0, 0,...,1] -- pad tokens with start of seq.
+    kickstart_seq = np.empty(window_size, dtype=np.int)
+    kickstart_seq[:-1] = pad_token
+    kickstart_seq[-1] = start_token
+    return kickstart_seq

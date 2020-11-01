@@ -8,16 +8,12 @@ import torch
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.loggers import NeptuneLogger
-from torch.utils.data import random_split
 from torch.utils.data.dataloader import DataLoader
 
-import mixture_models
-import plotting
 import settings
 import stat_metrics
 from tcn.model import TCNGenerator
-from tcn_utils import StatesDataset, generate_states, get_model_size, get_eff_memory
-
+from tcn_utils import StatesDataset, generate_states, get_model_size, get_eff_memory, get_init_seq
 
 seed_everything(1)
 
@@ -55,6 +51,8 @@ def main():
     with open(json_states, 'r') as jsf:
         states = np.array(json.load(jsf))
 
+    states = states + 2  # 2 special tokens
+
     n_classes = max(states) + 1
     n_levels = 7
     config = NetConfig(
@@ -76,6 +74,8 @@ def main():
     train_size = len(train_states) - int(len(train_states) * config.val_size)
 
     train_states, val_states = train_states[:train_size], train_states[train_size:]
+    kickstart_seq = get_init_seq(config.window_size)
+    train_states = np.concatenate([kickstart_seq, train_states])
     train_dataset = StatesDataset(train_states, window=config.window_size, device=device)
     val_dataset = StatesDataset(val_states, window=config.window_size, device=device)
 
@@ -132,17 +132,14 @@ def main():
 
     # evaluation part
     tcn_states = generate_states(model,
-                                 val_dataset,
                                  sample_number=len(test_states),
                                  window_size=config.window_size,
-                                 shuffle=False,
-                                 prepend_init_states=False,
                                  device=device)
 
     res_metrics = {}
 
     res_metrics.update(stat_metrics.calc_stats(test_states, tcn_states))
-    states_fig = 'gen_states.pdf'
+    # states_fig = 'gen_states.pdf'
     # st_fig = plotting.plot_states(tcn_states, state_numb=config.n_classes)
 
     # tcn_features = mixture_models.generate_features_from_gmm_states(gmm_model, tcn_states.numpy(), scaler)
