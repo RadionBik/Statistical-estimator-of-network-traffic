@@ -66,3 +66,9 @@ class TCNGenerator(LightningModule):
         accuracy = self._calc_accuracy(y_hat, y, self.config.n_classes)
         log = {'val_loss': loss, 'val_accuracy': accuracy}
         return log
+
+    def get_next_prediction(self, input_seq):
+        with torch.no_grad():
+            out = self(input_seq).squeeze(0)
+            sampled = out.max(1, keepdim=True)[1]
+            return sampled[-1].unsqueeze(1)

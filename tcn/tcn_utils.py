@@ -32,12 +32,6 @@ class StatesDataset(Dataset):
 
 
 def generate_states(model, dataset, sample_number, window_size, shuffle=False, prepend_init_states=True, device='cpu'):
-    def _get_next_prediction():
-        with torch.no_grad():
-            out = model(input_seq)
-            sampled = out.squeeze(0).max(1, keepdim=True)[1]
-            return sampled[-1].unsqueeze(1)
-
     model.eval()
 
     input_seq, _ = next(iter(DataLoader(dataset, batch_size=1, drop_last=True, shuffle=shuffle)))
@@ -55,7 +49,7 @@ def generate_states(model, dataset, sample_number, window_size, shuffle=False, p
         generated_samples[:window_size] = input_seq[0, :]
 
     for iteration in range(sample_number):
-        next_sample = _get_next_prediction()
+        next_sample = model.get_next_prediction(input_seq)
         input_seq = input_seq.roll(-1)
         input_seq[0, -1] = next_sample
         generated_samples[init_index + iteration] = next_sample
