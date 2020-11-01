@@ -160,21 +160,27 @@ def print_gmm(models, componentWeightThreshold=0.02):
                     'W: {0:1.3f}, M: {1:5.6f}, V: {2:5.8f}'.format(w, m, var))
 
 
-@utils.unpack_2layer_traffic_dict
-def get_gmm(df,
-            n_comp=None,
-            parameters=None,
-            sort_components=False,
-            **kwargs):
+def get_gmm(
+        df,
+        columns: tuple = None,
+        n_comp=None,
+        min_comp=20,
+        max_comp=40,
+        step_comp=1,
+        sort_components=False,
+        return_bic_dict=False,
+        **kwargs
+):
 
     if not n_comp:
-        comp_range = range(5, 20)
+        comp_range = range(min_comp, max_comp + 1, step_comp)
         logger.info(f'Started fitting GMM with auto number of components')
     else:
         comp_range = range(n_comp, n_comp + 1)
         logger.info(f'Started fitting GMM')
 
-    models = []
+    comp_model = {}
+    comp_bic = {}
     for comp in comp_range:
         if kwargs:
             model = BayesianGaussianMixture(n_components=comp,
@@ -188,13 +194,16 @@ def get_gmm(df,
                                     covariance_type="full",
                                     random_state=88)
 
-        df = df[parameters] if parameters else df
+        df = df[columns] if columns else df
 
         model.fit(df)
-        models.append(model)
+        comp_model[comp] = model
+        comp_bic[comp] = model.bic(df)
+        logger.info(f'fit model with {comp} components, BIC={comp_bic[comp]}')
 
-    best_model = min(models, key=lambda x: x.bic(df))
-    logger.info('Best BIC is with {} components'.format(best_model.n_components))
+    best_comp, best_bic = min(comp_bic.items(), key=lambda x: x[1])
+    best_model = comp_model[best_comp]
+    logger.info(f'Best BIC={best_bic} is with {best_comp} components')
 
     if sort_components:
         sorted_indexes = np.linalg.norm(best_model.means_, axis=1).argsort()
@@ -202,6 +211,8 @@ def get_gmm(df,
             setattr(best_model, attr, getattr(best_model, attr)[sorted_indexes])
         logger.info('reassigned components numbers according to their sorted norm')
 
+    if return_bic_dict:
+        return best_model, comp_bic
     return best_model
 
 
