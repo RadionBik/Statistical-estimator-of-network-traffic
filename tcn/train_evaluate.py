@@ -37,7 +37,7 @@ class NetConfig:
     dropout: float = 0.00
     batch_size: int = 256
     optimizer: str = 'Adam'
-    learning_rate: float = 0.005
+    learning_rate: float = 0.001
     grad_clip: float = 1.0
     val_size: float = 0.2
     model_size: int = 0

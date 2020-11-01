@@ -70,5 +70,6 @@ class TCNGenerator(LightningModule):
     def get_next_prediction(self, input_seq):
         with torch.no_grad():
             out = self(input_seq).squeeze(0)
-            sampled = out.max(1, keepdim=True)[1]
-            return sampled[-1].unsqueeze(1)
+            last_prob = torch.softmax(out[-1], 0)
+            pred = torch.multinomial(last_prob, 1)
+            return pred[0]
