@@ -2,6 +2,8 @@ import logging
 
 import dpkt
 import pandas as pd
+
+from pcap_parsing.parsed_fields import ParsedFields as PF
 from utils import TrafficObjects, mac_addr, ip_to_string, is_mac_addr, is_ip_addr
 
 logger = logging.getLogger(__name__)
@@ -37,9 +39,9 @@ def extract_host_stats(
         raise ValueError
 
     stats = {
-        'is_client': [],
-        'PS': [],
-        'TS': []
+        PF.is_source: [],
+        PF.ps: [],
+        PF.ts: []
     }
 
     packet_counter = 0
@@ -60,20 +62,20 @@ def extract_host_stats(
         src_id, dst_id = extract_id_from_packet(eth, identifier_type)
 
         if src_id == host:
-            stats['PS'].append(len(ip))
-            stats['TS'].append(ts)
-            stats['is_client'].append(True)
+            stats[PF.ps].append(len(ip))
+            stats[PF.ts].append(ts)
+            stats[PF.is_source].append(True)
         elif dst_id == host:
-            stats['PS'].append(len(ip))
-            stats['TS'].append(ts)
-            stats['is_client'].append(False)
+            stats[PF.ps].append(len(ip))
+            stats[PF.ts].append(ts)
+            stats[PF.is_source].append(False)
 
     stats = pd.DataFrame(stats)
-    iat_from = stats[stats['is_client']]['TS'].diff().fillna(0)
-    iat_to = stats[~stats['is_client']]['TS'].diff().fillna(0)
+    iat_from = stats[stats[PF.is_source]][PF.ts].diff().fillna(0)
+    iat_to = stats[~stats[PF.is_source]][PF.ts].diff().fillna(0)
 
-    stats['IAT, sec'] = pd.concat([iat_to, iat_from]).sort_index()
-    return stats
+    stats[PF.iat] = pd.concat([iat_to, iat_from]).sort_index()
+    return stats.reset_index(drop=True)
 
 
 if __name__ == '__main__':
