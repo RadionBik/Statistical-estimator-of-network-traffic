@@ -29,7 +29,6 @@ figures
 deviceStat.ipynb
 rnn_test.ipynb
 #figures/*.svg
-test_*
 bin/ndpi_deb
 bin/ndpi_arch
 extractPacketStats.py

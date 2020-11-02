@@ -223,22 +223,28 @@ def construct_new_dict_no_ts(ref_dict):
     return new_dict
 
 
-def save_obj(obj, name):
+def save_obj(obj, name, by_stem=True):
     """
     save_obj() saves python object to the file inside 'obj' directory
     """
-    dest_path = settings.BASE_DIR / f'obj/{name}.pkl'
+    if by_stem:
+        dest_path = settings.BASE_DIR / f'obj/{name}.pkl'
+    else:
+        dest_path = name
     with open(dest_path, 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
     logger.info(f'pickled obj to {dest_path}')
     return dest_path.as_posix()
 
 
-def load_obj(name):
+def load_obj(name, by_stem=True):
     """
     load_obj() loads python object from the file inside 'obj' directory
     """
-    load_path = settings.BASE_DIR / f'obj/{name}.pkl'
+    if by_stem:
+        load_path = settings.BASE_DIR / f'obj/{name}.pkl'
+    else:
+        load_path = name
     with open(load_path, 'rb') as f:
         obj = pickle.load(f)
         logger.info(f'loaded obj from {load_path}')

@@ -8,6 +8,8 @@ import pytest
 import pcap_parser as estimator
 import settings
 import utils
+from features.gaussian_quantizer import GaussianQuantizer
+from pcap_parsing.device_level import extract_host_stats
 
 STATIC_DIR = settings.BASE_DIR / 'tests' / 'static'
 
@@ -46,3 +48,12 @@ def gmm_states():
                                                              'to': load_json_states('gmm_skype_to.json')}
     return states
 
+
+@pytest.fixture
+def raw_host_stats():
+    return extract_host_stats(STATIC_DIR / 'rtp_711.pcap', '00:04:76:22:20:17')
+
+
+@pytest.fixture
+def gaussian_quantizer():
+    return GaussianQuantizer.from_pretrained(STATIC_DIR / 'amazon')
