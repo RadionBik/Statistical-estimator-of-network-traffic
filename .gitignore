@@ -25,6 +25,11 @@ estimator_libs/
 *.svg
 *.pdf
 *.model
+*.json
+*.csv
+*.png
+*.env
+*.rar
 figures
 deviceStat.ipynb
 rnn_test.ipynb
