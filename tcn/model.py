@@ -57,6 +57,8 @@ class TCNGenerator(LightningModule):
         y_hat = self(x)
         loss = self._calc_loss(y_hat, y, self.config.n_classes)
         accuracy = self._calc_accuracy(y_hat, y, self.config.n_classes)
+        self.log('train_accuracy', accuracy, on_step=False, on_epoch=True)
+        self.log('train_loss', loss, on_step=False, on_epoch=True)
         return {'loss': loss, 'accuracy': accuracy}
 
     def validation_step(self, batch, batch_idx):
@@ -64,8 +66,10 @@ class TCNGenerator(LightningModule):
         y_hat = self(x.contiguous())
         loss = self._calc_loss(y_hat, y, self.config.n_classes)
         accuracy = self._calc_accuracy(y_hat, y, self.config.n_classes)
-        log = {'val_loss': loss, 'val_accuracy': accuracy}
-        return log
+
+        self.log('val_accuracy', accuracy, on_step=False, on_epoch=True)
+        self.log('val_loss', loss, on_step=False, on_epoch=True)
+        return {'val_loss': loss, 'val_accuracy': accuracy}
 
     def get_next_prediction(self, input_seq):
         with torch.no_grad():
