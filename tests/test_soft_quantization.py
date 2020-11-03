@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 
 from features.gaussian_quantizer import GaussianQuantizer, multivariate_sampling_from_states
 from features.packet_scaler import PacketScaler
@@ -22,6 +23,11 @@ def test_scaler(raw_host_stats):
     assert np.isclose(source_features, scaler.inverse_transform(scaled_features), atol=10e-9).all()
 
 
+def get_ks_stat(orig_values, gen_values):
+    ks = scipy.stats.ks_2samp(orig_values, gen_values)
+    return ks.statistic
+
+
 def test_soft_quantizer(raw_host_stats):
     from sklearn.metrics import mean_absolute_error
 
@@ -36,7 +42,12 @@ def test_soft_quantizer(raw_host_stats):
     mae = mean_absolute_error(source_features, dec_features)
     print(f'MAE: {mae}')
     assert mae < 0.39
+    assert get_ks_stat(source_features[:, 0], dec_features[:, 0]) < 0.88
+    assert get_ks_stat(source_features[:, 1], dec_features[:, 1]) < 0.45
+
     prob_dec_features = gaussian_quantizer.inverse_transform(q_tokens, prob_sampling=True)
     mae = mean_absolute_error(source_features, prob_dec_features)
     print(f'MAE with probabilistic sampling: {mae}')
     assert mae < 1.07
+    assert get_ks_stat(source_features[:, 0], prob_dec_features[:, 0]) < 0.5
+    assert get_ks_stat(source_features[:, 1], prob_dec_features[:, 1]) < 0.06

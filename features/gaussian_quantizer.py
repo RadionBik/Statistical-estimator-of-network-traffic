@@ -82,12 +82,27 @@ class GaussianQuantizer:
         scaled_features = self.scaler.transform(features.copy())
         from_idx = client_direction_vector == True
         to_idx = ~from_idx
-        self.gmm_from = get_gmm(scaled_features[from_idx], **gmm_kwargs)
-        self.gmm_to = get_gmm(scaled_features[to_idx], **gmm_kwargs)
+
+        from_out = get_gmm(scaled_features[from_idx], **gmm_kwargs)
+        to_out = get_gmm(scaled_features[to_idx], **gmm_kwargs)
+
+        bic_dict = {}
+        if gmm_kwargs.get('return_bic_dict'):
+            self.gmm_from, bic_dict['from'] = from_out
+            self.gmm_to, bic_dict['to'] = to_out
+        else:
+            self.gmm_from = from_out
+            self.gmm_to = to_out
 
         self._n_tokens_from = self.gmm_from.n_components
         self._n_tokens_to = self.gmm_to.n_components
+        if gmm_kwargs.get('return_bic_dict'):
+            return self, bic_dict
         return self
+
+    @property
+    def n_tokens(self):
+        return self._n_reserved_tokens + self._n_tokens_from + self._n_tokens_to
 
 
 def multivariate_sampling_from_states(model: GaussianMixture, states, random_state=1):

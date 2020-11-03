@@ -4,6 +4,7 @@ import json
 from pprint import pprint
 
 import numpy as np
+import pandas as pd
 import torch
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import EarlyStopping
@@ -12,6 +13,8 @@ from torch.utils.data.dataloader import DataLoader
 
 import settings
 import stat_metrics
+from features.gaussian_quantizer import GaussianQuantizer
+from pcap_parsing.parsed_fields import select_features
 from tcn.model import TCNGenerator
 from tcn_utils import StatesDataset, generate_states, get_model_size, get_eff_memory, get_init_seq
 
@@ -51,14 +54,13 @@ class TCNConfig(TrainConfig):
 
 def main():
 
-    json_states = (TCN_DIR / 'gmm_skype_from.json').as_posix()
-    # gmm_model_path = (settings.BASE_DIR / 'obj' / 'skype_gmm.pkl').as_posix()
-    with open(json_states, 'r') as jsf:
-        states = np.array(json.load(jsf))
+    extr_stats = pd.read_csv(settings.BASE_DIR / 'traffic_dumps/iot_amazon_echo.pcap.csv', index_col=0)
 
-    states = states + 2  # 2 special tokens
+    train_size = len(extr_stats) - len(extr_stats) // 3
+    train_df, test_df = extr_stats.iloc[:train_size], extr_stats.iloc[train_size:]
+    quantizer = GaussianQuantizer.from_pretrained(settings.BASE_DIR / 'obj/amazon_train')
 
-    n_classes = max(states) + 1
+    n_classes = quantizer.n_tokens
     n_levels = 7
     config = TCNConfig(
         hidden_size=n_classes,
@@ -69,14 +71,14 @@ def main():
     )
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    train_size = len(states) - len(states) // 3
-    train_states, test_states = states[:train_size], states[train_size:]
+
+    train_states = quantizer.transform(*select_features(train_df), prepend_with_init_tokens=config.window_size)
+    test_states = quantizer.transform(*select_features(test_df))
 
     train_size = len(train_states) - int(len(train_states) * config.val_size)
 
     train_states, val_states = train_states[:train_size], train_states[train_size:]
 
-    train_states = np.concatenate([get_init_seq(config.window_size), train_states])
     train_dataset = StatesDataset(train_states, window=config.window_size, device=device)
     val_dataset = StatesDataset(val_states, window=config.window_size, device=device)
 
