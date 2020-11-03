@@ -9,12 +9,11 @@ logger = logging.getLogger(__name__)
 
 
 class StatesDataset(Dataset):
-    def __init__(self, states: np.ndarray, window=200, device='cpu'):
+    def __init__(self, states: np.ndarray, window=200):
         self.window_size = window
         states_tensor = torch.as_tensor(
             states,
             dtype=torch.float,
-            device=device
         )
         # chunk vector into windows shifted by one position, autoregressive approach
         ar_states = states_tensor.unfold(0, self.window_size, 1)

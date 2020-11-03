@@ -3,6 +3,7 @@ import pandas as pd
 import seaborn as sns
 
 from features.gaussian_quantizer import GaussianQuantizer
+from features.utils import load_train_test_dataset
 from pcap_parsing.parsed_fields import select_features
 from settings import BASE_DIR
 
@@ -16,13 +17,10 @@ def plot_bics(bics, direction):
 
 
 if __name__ == '__main__':
-    extr_stats = pd.read_csv(BASE_DIR / 'traffic_dumps/iot_amazon_echo.pcap.csv',
-                             nrows=10_000)
 
     scenario = 'amazon_10k'
 
-    train_size = len(extr_stats) - len(extr_stats) // 3
-    train_df, test_df = extr_stats.iloc[:train_size], extr_stats.iloc[train_size:]
+    train_df, test_df = load_train_test_dataset(BASE_DIR / 'traffic_dumps/iot_amazon_echo.pcap.csv', 10_000)
 
     quantizer, bic_dict = GaussianQuantizer().fit(
         *select_features(train_df),
