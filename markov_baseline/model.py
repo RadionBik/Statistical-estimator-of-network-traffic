@@ -1,7 +1,6 @@
 import logging
 
 import numpy as np
-from sklearn.cluster import KMeans
 from sklearn.preprocessing import normalize
 
 logger = logging.getLogger(__name__)

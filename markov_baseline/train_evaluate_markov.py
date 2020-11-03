@@ -1,5 +1,3 @@
-from pprint import pprint
-
 import settings
 import stat_metrics
 from features.gaussian_quantizer import GaussianQuantizer
