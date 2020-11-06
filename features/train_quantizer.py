@@ -24,7 +24,7 @@ if __name__ == '__main__':
 
     quantizer, bic_dict = GaussianQuantizer().fit(
         *select_features(train_df),
-        min_comp=10, max_comp=100, step_comp=4,
+        min_comp=10, max_comp=120, step_comp=4,
         return_bic_dict=True
     )
 
@@ -33,4 +33,4 @@ if __name__ == '__main__':
     plot_bics(bic_dict['from'], 'От источника')
     plot_bics(bic_dict['to'], 'К источнику')
     plt.tight_layout()
-    plt.savefig(f'{scenario}.png', dpi=300)
+    plt.savefig(BASE_DIR / 'obj' / scenario / 'BICs.png', dpi=300)
