@@ -21,8 +21,8 @@ def get_ks_2sample_stat(orig_values, gen_values):
     return scipy.stats.ks_2samp(orig_values, gen_values).statistic
 
 
-def restore_evaluate(quantizer, gen_states, test_df, verbose=True):
-    restored_packets, from_idx = quantizer.inverse_transform(gen_states)
+def evaluate_traffic(gen_df, test_df, verbose=True):
+    restored_packets, from_idx = select_features(gen_df)
     client_gen_packets = restored_packets[from_idx]
     server_gen_packets = restored_packets[~from_idx]
 

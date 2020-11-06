@@ -1,8 +1,8 @@
 import settings
 import stat_metrics
-from features.evaluation import restore_evaluate
+from features.evaluation import evaluate_traffic
 from features.gaussian_quantizer import GaussianQuantizer
-from features.data_utils import load_train_test_dataset, quantize_datatset
+from features.data_utils import load_train_test_dataset, quantize_datatset, restore_features
 from markov_baseline.model import MarkovSequenceGenerator
 
 
@@ -16,7 +16,8 @@ def main():
     model.fit(train_states)
     sampled = model.sample(len(test_states))
     seq_metrics = stat_metrics.calc_stats(test_states, sampled)
-    eval_metrics = restore_evaluate(quantizer, sampled, test_df)
+    gen_df = restore_features(quantizer, sampled)
+    eval_metrics = evaluate_traffic(gen_df, test_df)
 
 
 if __name__ == '__main__':
