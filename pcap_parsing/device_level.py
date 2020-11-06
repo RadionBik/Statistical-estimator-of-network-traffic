@@ -71,10 +71,11 @@ def extract_host_stats(
             stats[PF.is_source].append(False)
 
     stats = pd.DataFrame(stats)
-    iat_from = stats[stats[PF.is_source]][PF.ts].diff().fillna(0)
-    iat_to = stats[~stats[PF.is_source]][PF.ts].diff().fillna(0)
+    # calc IAT and convert from seconds to ms
+    iat_from = stats[stats[PF.is_source]][PF.ts].diff().fillna(0) * 1000
+    iat_to = stats[~stats[PF.is_source]][PF.ts].diff().fillna(0) * 1000
 
-    stats[PF.iat] = pd.concat([iat_to, iat_from]).sort_index()
+    stats[PF.iat] = pd.concat([iat_to, iat_from]).sort_index().round(0)
     return stats.reset_index(drop=True)
 
 

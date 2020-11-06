@@ -3,7 +3,7 @@ import pandas as pd
 import seaborn as sns
 
 from features.gaussian_quantizer import GaussianQuantizer
-from features.utils import load_train_test_dataset
+from features.data_utils import load_train_test_dataset
 from pcap_parsing.parsed_fields import select_features
 from settings import BASE_DIR
 

@@ -3,7 +3,7 @@ import pandas as pd
 
 class ParsedFields:
     ps = 'PS, байт'
-    iat = 'IAT, сек'
+    iat = 'IAT, мс'
     ts = 'TS'
     is_source = 'От источника'
 

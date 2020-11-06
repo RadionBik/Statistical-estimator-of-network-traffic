@@ -12,7 +12,7 @@ from torch.utils.data.dataloader import DataLoader
 import settings
 import stat_metrics
 from features.gaussian_quantizer import GaussianQuantizer
-from features.utils import load_train_test_dataset, quantize_datatset
+from features.data_utils import load_train_test_dataset, quantize_datatset
 from tcn.model import TCNGenerator
 from tcn_utils import StatesDataset, generate_states, get_model_size, get_eff_memory
 
