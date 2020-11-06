@@ -11,8 +11,9 @@ from torch.utils.data.dataloader import DataLoader
 
 import settings
 import stat_metrics
+from features.evaluation import evaluate_traffic
 from features.gaussian_quantizer import GaussianQuantizer
-from features.data_utils import load_train_test_dataset, quantize_datatset
+from features.data_utils import load_train_test_dataset, quantize_datatset, restore_features
 from tcn.model import TCNGenerator
 from tcn_utils import StatesDataset, generate_states, get_model_size, get_eff_memory
 
@@ -136,13 +137,14 @@ def main():
                                  device=device)
 
     res_metrics = stat_metrics.calc_stats(test_states, tcn_states)
-    for k, v in res_metrics.items():
+
+    gen_df = restore_features(quantizer, tcn_states)
+    eval_metrics = evaluate_traffic(gen_df, test_df)
+
+    for k, v in dict(**res_metrics, **eval_metrics).items():
         neptune_logger.experiment.log_metric(k, v)
 
     neptune_logger.experiment.stop()
-
-    with open(TCN_DIR / 'tcn_states.json', 'w') as jf:
-        json.dump(tcn_states.tolist(), jf)
 
 
 if __name__ == '__main__':
