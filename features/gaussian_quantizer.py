@@ -76,7 +76,7 @@ class GaussianQuantizer:
             restored_features[from_idx] = self.gmm_from.means_[from_clusters]
             restored_features[to_idx] = self.gmm_to.means_[to_clusters]
         restored_features = self.scaler.inverse_transform(restored_features)
-        return restored_features
+        return restored_features, from_idx
 
     def fit(self, features, client_direction_vector, **gmm_kwargs):
         scaled_features = self.scaler.transform(features.copy())
