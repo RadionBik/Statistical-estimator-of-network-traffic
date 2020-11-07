@@ -19,18 +19,18 @@ def plot_bics(bics, direction):
 if __name__ == '__main__':
 
     scenario = 'amazon_10k'
+    save_dir = BASE_DIR / 'obj' / scenario
 
-    train_df, test_df = load_train_test_dataset(BASE_DIR / 'traffic_dumps/iot_amazon_echo.pcap.csv', 10_000)
+    train_df, test_df = load_train_test_dataset(BASE_DIR / 'traffic_dumps/iot_amazon_echo.pcap.csv')
 
     quantizer, bic_dict = GaussianQuantizer().fit(
         *select_features(train_df),
         min_comp=10, max_comp=120, step_comp=4,
         return_bic_dict=True
     )
-
-    quantizer.save_pretrained(BASE_DIR / 'obj' / scenario)
+    quantizer.save_pretrained(save_dir)
 
     plot_bics(bic_dict['from'], 'От источника')
     plot_bics(bic_dict['to'], 'К источнику')
     plt.tight_layout()
-    plt.savefig(BASE_DIR / 'obj' / scenario / 'BICs.png', dpi=300)
+    plt.savefig(save_dir / 'BICs.png', dpi=300)

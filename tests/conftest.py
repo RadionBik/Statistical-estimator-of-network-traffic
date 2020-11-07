@@ -50,8 +50,13 @@ def gmm_states():
 
 
 @pytest.fixture
-def raw_host_stats():
-    return extract_host_stats(STATIC_DIR / 'rtp_711.pcap', '00:04:76:22:20:17')
+def pcap_file():
+    return STATIC_DIR / 'rtp_711.pcap'
+
+
+@pytest.fixture
+def raw_host_stats(pcap_file):
+    return extract_host_stats(pcap_file, '00:04:76:22:20:17')
 
 
 @pytest.fixture
