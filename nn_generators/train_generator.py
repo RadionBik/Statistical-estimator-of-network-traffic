@@ -106,7 +106,7 @@ def main():
         offline_mode=not args.log_neptune,
         close_after_fit=False,
         project_name=settings.NEPTUNE_PROJECT,
-        experiment_name=class_mapper.model.__class__.__name__,
+        experiment_name=args.generator_name,
         params=dataclasses.asdict(model_config),
     )
 
