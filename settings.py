@@ -1,11 +1,12 @@
-import os
 import logging
-import sys
+import os
 import pathlib
+
 import numpy as np
 
-np.random.seed(1)
 
+RANDOM_SEED = 1
+np.random.seed(RANDOM_SEED)
 
 BASE_DIR = pathlib.Path(os.path.dirname(__file__))
 

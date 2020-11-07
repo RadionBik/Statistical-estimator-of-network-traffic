@@ -3,8 +3,8 @@ import pandas as pd
 from pcap_parsing.parsed_fields import select_features, ParsedFields
 
 
-def load_train_test_dataset(path, nrows=None):
-    extr_stats = pd.read_csv(path, nrows=nrows)
+def load_train_test_dataset(path, max_rows=10_000):
+    extr_stats = pd.read_csv(path, nrows=max_rows)
     train_size = len(extr_stats) - len(extr_stats) // 3
     train_df, test_df = extr_stats.iloc[:train_size], extr_stats.iloc[train_size:]
     return train_df, test_df

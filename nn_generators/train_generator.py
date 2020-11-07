@@ -1,5 +1,8 @@
 
+import argparse
 import dataclasses
+import os
+import pathlib
 from pprint import pprint
 
 import torch
@@ -13,23 +16,55 @@ import stat_metrics
 from features.data_utils import load_train_test_dataset, quantize_datatset, restore_features
 from features.evaluation import evaluate_traffic
 from features.gaussian_quantizer import GaussianQuantizer
-from nn_generators.scenario_mapper import SCENARIO_MAPPER
 from nn_generators.nn_utils import generate_states, get_model_size
+from nn_generators.scenario_mapper import SCENARIO_MAPPER
 
-seed_everything(1)
+seed_everything(settings.RANDOM_SEED)
 CURR_DIR = settings.BASE_DIR / 'nn_generators'
 
 
+def _parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--dataset',
+        help='path to preprocessed .csv dataset',
+        required=True
+    )
+
+    parser.add_argument(
+        '--quantizer_path',
+        help='path to the quantizer checkpoint',
+        required=True
+    )
+    parser.add_argument(
+        '--generator_name',
+        dest='generator_name',
+        help='must be either TCN or RNN',
+        default='RNN'
+    )
+    parser.add_argument(
+        '--log_neptune',
+        dest='log_neptune',
+        action='store_true',
+        default=False
+    )
+    args = parser.parse_args()
+    return args
+
+
 def main():
+    args = _parse_args()
 
-    train_df, test_df = load_train_test_dataset(settings.BASE_DIR / 'traffic_dumps/iot_amazon_echo.pcap.csv', 10_000)
-    q_path = settings.BASE_DIR / 'obj' / 'amazon_10k'
-    quantizer = GaussianQuantizer.from_pretrained(q_path)
+    train_df, test_df = load_train_test_dataset(args.dataset)
 
-    class_mapper = SCENARIO_MAPPER['RNN']
+    quantizer = GaussianQuantizer.from_pretrained(args.quantizer_path)
+    try:
+        class_mapper = SCENARIO_MAPPER[args.generator_name]
+    except KeyError:
+        raise ValueError('cannot find such generator')
 
     model_config = class_mapper.config(
-        scenario=q_path.stem,
+        scenario=pathlib.Path(args.quantizer_path).stem,
         n_classes=quantizer.n_tokens,
     )
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -48,13 +83,14 @@ def main():
     model = class_mapper.model(model_config)
 
     model_config.model_size = get_model_size(model)
+    cpu_counter = os.cpu_count()
 
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=model_config.batch_size,
         drop_last=False,
         shuffle=False,
-        num_workers=6,
+        num_workers=cpu_counter,
     )
 
     val_dataloader = DataLoader(
@@ -62,12 +98,12 @@ def main():
         batch_size=model_config.batch_size,
         drop_last=False,
         shuffle=False,
-        num_workers=6,
+        num_workers=cpu_counter,
     )
 
     neptune_logger = NeptuneLogger(
         api_key=settings.NEPTUNE_API_TOKEN,
-        offline_mode=True,
+        offline_mode=not args.log_neptune,
         close_after_fit=False,
         project_name=settings.NEPTUNE_PROJECT,
         experiment_name=class_mapper.model.__class__.__name__,
