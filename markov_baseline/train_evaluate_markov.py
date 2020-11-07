@@ -1,16 +1,33 @@
-import settings
+import argparse
+
 import stat_metrics
+from features.data_utils import load_train_test_dataset, quantize_datatset, restore_features
 from features.evaluation import evaluate_traffic
 from features.gaussian_quantizer import GaussianQuantizer
-from features.data_utils import load_train_test_dataset, quantize_datatset, restore_features
 from markov_baseline.model import MarkovSequenceGenerator
 
 
+def _parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--dataset',
+        help='path to preprocessed .csv dataset',
+        required=True
+    )
+    parser.add_argument(
+        '--quantizer_path',
+        help='path to the quantizer checkpoint',
+        required=True
+    )
+    return parser.parse_args()
+
+
 def main():
-    train_df, test_df = load_train_test_dataset(settings.BASE_DIR / 'traffic_dumps/iot_amazon_echo.pcap.csv',
-                                                10_000)
-    q_path = settings.BASE_DIR / 'obj' / 'amazon_10k'
-    quantizer = GaussianQuantizer.from_pretrained(q_path)
+
+    args = _parse_args()
+
+    train_df, test_df = load_train_test_dataset(args.dataset)
+    quantizer = GaussianQuantizer.from_pretrained(args.quantizer_path)
     train_states, test_states = quantize_datatset(quantizer, train_df, test_df)
     model = MarkovSequenceGenerator()
     model.fit(train_states)
