@@ -3,8 +3,10 @@ from pprint import pprint
 import numpy as np
 import pandas as pd
 import scipy
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-from pcap_parsing.parsed_fields import select_features
+from pcap_parsing.parsed_fields import select_features, ParsedFields
 
 
 def packets_to_throughput(packets, resolution='1S'):
@@ -43,3 +45,43 @@ def evaluate_traffic(gen_df, test_df, verbose=True):
     if verbose:
         pprint(metrics)
     return metrics
+
+
+def scatter_plot_with_kde(df, x='IAT, s', y='PS, bytes', fig_shifter=0, fig=None, title=''):
+    if not fig:
+        plt.figure(figsize=(13, 6))
+
+    layout = (4, 8)
+
+    x = pd.Series(df[x])
+    y = pd.Series(df[y])
+
+    kde_x = plt.subplot2grid(layout, (0, fig_shifter), colspan=3)
+    kde_y = plt.subplot2grid(layout, (1, fig_shifter + 3), rowspan=3)
+    scatter = plt.subplot2grid(layout, (1, fig_shifter), rowspan=3, colspan=3)
+
+    sc_ax = sns.scatterplot(x=x, y=y, data=df, ax=scatter, alpha=0.5)
+    if fig_shifter == 4:
+        sc_ax.set_ylabel('')
+    kde_x.set_xlim(sc_ax.get_xlim())
+    kde_y.set_ylim(sc_ax.get_ylim())
+    kde_x.axis('off')
+    kde_y.axis('off')
+    if title:
+        kde_x.set_title(title)
+
+    sns.distplot(x, vertical=0, ax=kde_x)
+    sns.distplot(y, vertical=1, ax=kde_y)
+
+
+def plot_packets_dist(stats, x=ParsedFields.iat, y=ParsedFields.ps):
+    fig = plt.figure(figsize=(13, 6))
+
+    from_idx = stats[ParsedFields.is_source]
+    for idx, direction in enumerate(['От источника', 'К источнику']):
+        if direction == 'От источника':
+            packets = stats[from_idx]
+        else:
+            packets = stats[~from_idx]
+        scatter_plot_with_kde(packets, x=x, y=y, fig=fig, fig_shifter=idx*4, title=direction)
+    plt.tight_layout()

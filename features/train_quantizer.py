@@ -1,10 +1,16 @@
+import argparse
+import pathlib
+
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 import seaborn as sns
 
 from features.gaussian_quantizer import GaussianQuantizer
 from features.data_utils import load_train_test_dataset
-from pcap_parsing.parsed_fields import select_features
+from features.evaluation import plot_packets_dist
+from features.packet_scaler import PacketScaler
+from pcap_parsing.parsed_fields import select_features, ParsedFields
 from settings import BASE_DIR
 
 
@@ -16,12 +22,18 @@ def plot_bics(bics, direction):
     ax.legend()
 
 
-if __name__ == '__main__':
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--dataset',
+        help='path to preprocessed .csv dataset',
+        required=True
+    )
+    args = parser.parse_args()
+    ds_path = pathlib.Path(args.dataset)
+    save_dir = BASE_DIR / 'obj' / ds_path.stem
 
-    scenario = 'amazon_10k'
-    save_dir = BASE_DIR / 'obj' / scenario
-
-    train_df, test_df = load_train_test_dataset(BASE_DIR / 'traffic_dumps/iot_amazon_echo.pcap.csv')
+    train_df, test_df = load_train_test_dataset(ds_path)
 
     quantizer, bic_dict = GaussianQuantizer().fit(
         *select_features(train_df),
@@ -34,3 +46,16 @@ if __name__ == '__main__':
     plot_bics(bic_dict['to'], 'К источнику')
     plt.tight_layout()
     plt.savefig(save_dir / 'BICs.png', dpi=300)
+    plot_packets_dist(train_df)
+    plt.savefig(save_dir / 'packets.png', dpi=300)
+
+    scaled = PacketScaler().transform(select_features(train_df)[0])
+    scaled = pd.DataFrame(scaled, columns=['PS, байт / 1500', 'log(IAT, мс)'])
+    scaled[ParsedFields.is_source] = train_df[ParsedFields.is_source].reset_index(drop=True)
+
+    plot_packets_dist(scaled, x='log(IAT, мс)', y='PS, байт / 1500')
+    plt.savefig(save_dir / 'scaled_packets.png', dpi=300)
+
+
+if __name__ == '__main__':
+    main()
