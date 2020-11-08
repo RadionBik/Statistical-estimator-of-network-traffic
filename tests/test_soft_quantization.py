@@ -35,15 +35,16 @@ def test_soft_quantizer(raw_host_stats):
     dec_features, dec_directions = gaussian_quantizer.inverse_transform(q_tokens, prob_sampling=False)
 
     assert (directions == dec_directions).all()
-    mae = mean_absolute_error(source_features, dec_features)
-    print(f'MAE: {mae}')
-    # assert mae < 0.39
-    # assert get_ks_2sample_stat(source_features[:, 0], dec_features[:, 0]) < 0.88
-    # assert get_ks_2sample_stat(source_features[:, 1], dec_features[:, 1]) < 0.45
+    mean_exp_values = source_features.mean(axis=0)
+    mape = mean_absolute_error(source_features / mean_exp_values, dec_features / mean_exp_values)
+    print(f'MAPE: {mape}')
+    assert mape < 0.035
+    assert get_ks_2sample_stat(source_features[:, 0], dec_features[:, 0]) < 0.54
+    assert get_ks_2sample_stat(source_features[:, 1], dec_features[:, 1]) < 0.73
 
     prob_dec_features, prob_dec_directions = gaussian_quantizer.inverse_transform(q_tokens, prob_sampling=True)
-    mae = mean_absolute_error(source_features, prob_dec_features)
-    print(f'MAE with probabilistic sampling: {mae}')
-    # assert mae < 1.07
+    mape = mean_absolute_error(source_features / mean_exp_values, prob_dec_features / mean_exp_values)
+    print(f'MAPE with probabilistic sampling: {mape}')
+    assert mape < 0.05
     assert get_ks_2sample_stat(source_features[:, 0], prob_dec_features[:, 0]) < 0.5
-    assert get_ks_2sample_stat(source_features[:, 1], prob_dec_features[:, 1]) < 0.06
+    assert get_ks_2sample_stat(source_features[:, 1], prob_dec_features[:, 1]) < 0.28

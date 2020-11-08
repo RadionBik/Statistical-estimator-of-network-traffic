@@ -1,6 +1,5 @@
 import json
 import pickle
-from collections import defaultdict
 
 import numpy as np
 import pytest
@@ -28,14 +27,6 @@ def gmm_model():
 @pytest.fixture
 def gmm_state():
     return load_json_states('gmm_skype_from.json')
-
-
-@pytest.fixture
-def gmm_states():
-    states = defaultdict(dict)
-    states['UDP 192.168.0.102:18826 192.168.0.105:26454'] = {'from': load_json_states('gmm_skype_from.json'),
-                                                             'to': load_json_states('gmm_skype_to.json')}
-    return states
 
 
 @pytest.fixture

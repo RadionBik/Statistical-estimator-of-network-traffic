@@ -7,6 +7,7 @@ from sklearn.mixture import GaussianMixture, BayesianGaussianMixture
 
 from features.packet_scaler import PacketScaler
 from features.data_utils import save_obj, load_obj
+from settings import RANDOM_SEED
 
 logger = logging.getLogger(__name__)
 
@@ -82,11 +83,9 @@ class GaussianQuantizer:
 
     def fit(self, features, client_direction_vector, **gmm_kwargs):
         scaled_features = self.scaler.transform(features.copy())
-        from_idx = client_direction_vector == True
-        to_idx = ~from_idx
 
-        from_out = get_gmm(scaled_features[from_idx], **gmm_kwargs)
-        to_out = get_gmm(scaled_features[to_idx], **gmm_kwargs)
+        from_out = get_gmm(scaled_features[client_direction_vector], **gmm_kwargs)
+        to_out = get_gmm(scaled_features[~client_direction_vector], **gmm_kwargs)
 
         bic_dict = {}
         if gmm_kwargs.get('return_bic_dict'):
@@ -107,7 +106,7 @@ class GaussianQuantizer:
         return self._n_reserved_tokens + self._n_tokens_from + self._n_tokens_to
 
 
-def multivariate_sampling_from_states(model: GaussianMixture, states, random_state=1):
+def multivariate_sampling_from_states(model: GaussianMixture, states, random_state=RANDOM_SEED):
     rng = np.random.default_rng(seed=random_state)
     restored_features = np.zeros((len(states), model.n_features_in_))
     for i, state in enumerate(states.astype(np.int)):
@@ -146,12 +145,12 @@ def get_gmm(
                                             covariance_type="full",
                                             max_iter=500,
                                             tol=0.001,
-                                            random_state=88,
+                                            random_state=RANDOM_SEED,
                                             **kwargs)
         else:
             model = GaussianMixture(n_components=comp,
                                     covariance_type="full",
-                                    random_state=88)
+                                    random_state=RANDOM_SEED)
 
         df = df[columns] if columns else df
 
