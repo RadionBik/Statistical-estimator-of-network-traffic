@@ -6,7 +6,7 @@ class BaseConfig:
     scenario: str
     n_classes: int
 
-    es_patience: int = 1
+    es_patience: int = 3
     batch_size: int = 256
     optimizer: str = 'Adam'
     learning_rate: float = 0.001

@@ -16,7 +16,7 @@ def generate_states(model, sample_number, window_size, device='cpu'):
     generated_samples = torch.zeros(sample_number,
                                     device=device,
                                     dtype=torch.long)
-    logger.debug(f'starting generating with sample_number={sample_number}')
+    logger.info(f'starting generating with sample_number={sample_number}')
 
     for iteration in range(sample_number):
         next_sample = model.get_next_prediction(input_seq)

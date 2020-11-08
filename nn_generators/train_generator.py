@@ -7,7 +7,7 @@ from pprint import pprint
 
 import torch
 from pytorch_lightning import Trainer, seed_everything
-from pytorch_lightning.callbacks import EarlyStopping
+from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
 from pytorch_lightning.loggers import NeptuneLogger
 from torch.utils.data.dataloader import DataLoader
 
@@ -114,12 +114,12 @@ def main():
         monitor='val_loss',
         min_delta=0.005,
         patience=model_config.es_patience,
-        verbose=False,
+        verbose=True,
         mode='min'
     )
 
     trainer = Trainer(
-        callbacks=[early_stop_callback],
+        callbacks=[early_stop_callback, LearningRateMonitor()],
         auto_lr_find=False,
         gpus=int(device == 'cuda'),
         gradient_clip_val=model_config.grad_clip,
@@ -138,7 +138,7 @@ def main():
 
     state_metrics = features.evaluation.calc_stats(test_states, gen_states)
 
-    gen_df = restore_features(quantizer, gen_states)
+    gen_df = restore_features(quantizer, gen_states.numpy())
     packet_metrics = evaluate_traffic(gen_df, test_df)
 
     for k, v in dict(**state_metrics, **packet_metrics).items():

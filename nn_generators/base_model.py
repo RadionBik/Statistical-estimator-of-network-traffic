@@ -9,7 +9,7 @@ class NNBaseGenerator(LightningModule):
 
     def configure_optimizers(self):
         optimizer = getattr(torch.optim, self.config.optimizer)(self.parameters(), lr=self.config.learning_rate)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=1)
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
@@ -23,7 +23,7 @@ class NNBaseGenerator(LightningModule):
         x, y = batch
         y_hat = self(x)
         loss = self._calc_loss(y_hat, y)
-        self.log('train_loss', loss, on_step=False, on_epoch=True)
+        self.log('train_loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
         return {'loss': loss}
 
     def validation_step(self, batch, batch_idx):
@@ -31,7 +31,7 @@ class NNBaseGenerator(LightningModule):
         y_hat = self(x.contiguous())
         loss = self._calc_loss(y_hat, y)
 
-        self.log('val_loss', loss, on_step=False, on_epoch=True)
+        self.log('val_loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
         return {'val_loss': loss}
 
     def get_next_prediction(self, input_seq):
