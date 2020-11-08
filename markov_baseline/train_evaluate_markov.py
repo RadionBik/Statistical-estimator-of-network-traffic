@@ -2,10 +2,9 @@ import argparse
 
 import neptune
 
-import features.evaluation
 import settings
 from features.data_utils import load_train_test_dataset, quantize_datatset, restore_features
-from features.evaluation import evaluate_traffic
+from features.evaluation import evaluate_traffic, calc_stats
 from features.gaussian_quantizer import GaussianQuantizer
 from markov_baseline.model import MarkovSequenceGenerator
 
@@ -41,7 +40,7 @@ def main():
     model = MarkovSequenceGenerator()
     model.fit(train_states)
     sampled = model.sample(len(test_states))
-    seq_metrics = features.evaluation.calc_stats(test_states, sampled)
+    seq_metrics = calc_stats(test_states, sampled)
     gen_df = restore_features(quantizer, sampled)
     eval_metrics = evaluate_traffic(gen_df, test_df)
     if args.log_neptune:

@@ -1,9 +1,12 @@
 import argparse
+import logging
 import pathlib
-from pprint import pprint
 
 from pcap_parsing.device_level import extract_host_stats
 from pcap_parsing.flow_level import extract_flow_stats
+import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_args():
@@ -33,7 +36,7 @@ def _parse_args():
 
 def main():
     args = _parse_args()
-    pprint(args)
+    logger.info(args)
     if args.flow_level:
         extractor = extract_flow_stats
     else:

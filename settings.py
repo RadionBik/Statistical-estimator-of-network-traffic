@@ -5,7 +5,7 @@ import pathlib
 import numpy as np
 
 
-RANDOM_SEED = 1
+RANDOM_SEED = int(os.environ.get('RANDOM_SEED', 1))
 np.random.seed(RANDOM_SEED)
 
 BASE_DIR = pathlib.Path(os.path.dirname(__file__))

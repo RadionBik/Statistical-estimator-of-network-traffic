@@ -3,12 +3,11 @@ import pathlib
 
 import matplotlib.pyplot as plt
 import pandas as pd
-import numpy as np
 import seaborn as sns
 
-from features.gaussian_quantizer import GaussianQuantizer
 from features.data_utils import load_train_test_dataset
 from features.evaluation import plot_packets_dist
+from features.gaussian_quantizer import GaussianQuantizer
 from features.packet_scaler import PacketScaler
 from pcap_parsing.parsed_fields import select_features, ParsedFields
 from settings import BASE_DIR

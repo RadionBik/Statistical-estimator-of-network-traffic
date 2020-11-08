@@ -11,10 +11,9 @@ from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
 from pytorch_lightning.loggers import NeptuneLogger
 from torch.utils.data.dataloader import DataLoader
 
-import features.evaluation
 import settings
 from features.data_utils import load_train_test_dataset, quantize_datatset, restore_features
-from features.evaluation import evaluate_traffic
+from features.evaluation import evaluate_traffic, calc_stats
 from features.gaussian_quantizer import GaussianQuantizer
 from nn_generators.nn_utils import generate_states, get_model_size
 from nn_generators.scenario_mapper import SCENARIO_MAPPER
@@ -136,7 +135,7 @@ def main():
                                  window_size=model_config.window_size,
                                  device=device)
 
-    state_metrics = features.evaluation.calc_stats(test_states, gen_states)
+    state_metrics = calc_stats(test_states, gen_states)
 
     gen_df = restore_features(quantizer, gen_states.numpy())
     packet_metrics = evaluate_traffic(gen_df, test_df)
