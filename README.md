@@ -1,58 +1,55 @@
 # Statistical estimator of network traffic
 
-The library is dedicated to estimating statistical properties of netwrok flows or devices
- given a .pcap file. 
+The library is dedicated to estimating statistical properties of packets grouped
+ within a network flows or even a device, given a .pcap file and target object identifier. 
 
-To begin, setup a virtual environment (Python 3.7), and start with exploring 
-jupyter notebooks.
+The identifier must be specified at .pcap processing stage, where packet-related
+ features (packet size, inter-arrival time and direction) are extracted. For 
+ example, to extract device-level stats you can try the following:
 
-## Jupyter notebooks
+```
+export PYTHONPATH=.
 
-The notebooks were converted via [Jupytext](https://github.com/mwouts/jupytext) to 
-`.py` format and stored within the 
-`jupytext_notebooks` folder. To restore jupyter notebooks (`.ipynb`), execute:
+python pcap_parsing/main.py \
+--pcapfile=traffic_dumps/iot_amazon_echo.pcap \
+--identifier='44:65:0d:56:cc:d3'
+```
+To process a separate flow, do something like:
+```
+python pcap_parsing/main.py \
+--pcapfile=traffic_dumps/skypeLANhome.pcap \
+--identifier="UDP 192.168.0.102:18826 192.168.0.105:26454" \
+--flow_level
+```
 
-    jupytext --to notebook jupytext_notebooks/ITL_paper.py 
+Given the target stats, we need to train a gaussian mixture that 
+maps a packet's features to a centroid value, effectively 
+transforming initial features to discrete sequences.
 
+```
+python features/train_quantizer.py \
+--dataset="traffic_dumps/iot_amazon_echo_44:65:0d:56:cc:d3.csv"
+```
 
-The most important notebook is `ITL_paper.py` that contains the code implementing results
-from the following paper:
+This allows us to easily use various sequence models, like Markov chains:
+```
+python markov_baseline/train_evaluate_markov.py \
+--dataset="traffic_dumps/iot_amazon_echo_44:65:0d:56:cc:d3.csv" \
+--quantizer_path="obj/iot_amazon_echo_44:65:0d:56:cc:d3"
+```
+or autoregressive neural networks, either recurrent (RNN) or temporal
+convolutional networks (TCN):
+```
+python nn_generators/train_generator.py \
+--dataset="traffic_dumps/iot_amazon_echo_44:65:0d:56:cc:d3.csv" \
+--quantizer_path="obj/iot_amazon_echo_44:65:0d:56:cc:d3" \
+--generator_name=RNN
+```
+ 
+## ITL paper
+
+The code for the paper below is available at this 
+[tag](https://github.com/RadionBik/Statistical-estimator-of-network-traffic/releases/tag/v0.1):
  
 * Bikmukhamedov R., Nadeev A., Maione G., and Striccoli D., "Comparison of HMM and RNN
 models for network traffic modeling", _Internet Technology Letters_, 2020. DOI: 10.1002/itl2.147
-
- 
-## Imitator
-
-This repo was developed around idea to develop software that would allow to imitate
-any given device or a flow. At this point, the algorithms used in the estimator itself
-are a bit obsolote, so for the freshest ones check out the notebooks provided above. 
-
-The estimator consists of 2 main parts: estimator and generator.
-
-### Traffic estimator
-
-The estimator takes a pcap file and for all (or those specified in `addresses_to_check.txt`) 
-flows extracts the Payload Length and the Inter-Arrival Time parameters. 
-Afterwards, the EM-algorithm is applied to fit a gaussian mixture (up to 5 components) 
-to each parameter and the trained model is saved to a file in the `obj/` folder.
-
-Usage examples:
-    
-    python packet_estimator.py -p traffic_dumps/skypeLANhome.pcap -i flow --plot
-
-    python packet_estimator.py -p traffic_dumps/skypeLANhome.pcap -i flow -f all -n auto
-
-
-### Traffic generator
-
-The generator uses the saved EM-model to generate packets with length and delay drawn from the estimated distributions. The side has to be specified, either 'local' (the estimated side) or 'remote' (remote end).   
-
-Example run for the local side:
-
-    python packet_transceiver.py  -m local -i wlp2s0 -d 192.168.88.20 -o obj/skypeLANhome__auto_components.pkl
-
-.. and the remote:
-
-    python packet_transceiver.py -m remote -i wlp2s0 -d 192.168.88.10 -o obj/skypeLANhome__auto_components.pkl
-   
