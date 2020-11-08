@@ -10,7 +10,6 @@ offline-name
 venv
 
 temp_py/
-#figures/
 __pychache__
 .ipynb_checkpoints/
 rnn_models/
@@ -25,11 +24,16 @@ estimator_libs/
 *.svg
 *.pdf
 *.model
+*.json
+*.csv
+*.png
+*.env
+*.rar
+*.ckpt
+*.ipynb
 figures
-deviceStat.ipynb
-rnn_test.ipynb
+
 #figures/*.svg
-test_*
 bin/ndpi_deb
 bin/ndpi_arch
 extractPacketStats.py
