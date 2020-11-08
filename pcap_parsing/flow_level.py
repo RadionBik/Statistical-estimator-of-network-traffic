@@ -1,3 +1,4 @@
+import logging
 from typing import NamedTuple, Optional
 
 import dpkt
@@ -6,8 +7,9 @@ import pandas as pd
 from pcap_parsing.calc_stats import form_df
 from pcap_parsing.packet_iterator import packet_iterator
 from pcap_parsing.parsed_fields import ParsedFields as PF
-from settings import logger
-from utils import ip_to_string
+from pcap_parsing.ip_utils import ip_to_string
+
+logger = logging.getLogger(__name__)
 
 
 class FlowTuple(NamedTuple):

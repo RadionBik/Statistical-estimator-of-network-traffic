@@ -1,6 +1,12 @@
+import logging
+import pickle
+
 import pandas as pd
 
+import settings
 from pcap_parsing.parsed_fields import select_features, ParsedFields
+
+logger = logging.getLogger(__name__)
 
 
 def _filter_iat_outliers(df):
@@ -27,7 +33,35 @@ def quantize_datatset(quantizer, train_df, test_df, prepend_with_init_tokens=0):
 
 
 def restore_features(quantizer, gen_states):
-    restored_packets, from_idx = quantizer.inverse_transform(gen_states)
+    restored_packets, from_idx = quantizer.inverse_transform(gen_states, prob_sampling=True)
     packets = pd.DataFrame(restored_packets, columns=[ParsedFields.ps, ParsedFields.iat])
     packets[ParsedFields.is_source] = from_idx
     return packets
+
+
+def save_obj(obj, name, by_stem=True):
+    """
+    save_obj() saves python object to the file inside 'obj' directory
+    """
+    if by_stem:
+        dest_path = settings.BASE_DIR / f'obj/{name}.pkl'
+    else:
+        dest_path = name
+    with open(dest_path, 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+    logger.info(f'pickled obj to {dest_path}')
+    return dest_path.as_posix()
+
+
+def load_obj(name, by_stem=True):
+    """
+    load_obj() loads python object from the file inside 'obj' directory
+    """
+    if by_stem:
+        load_path = settings.BASE_DIR / f'obj/{name}.pkl'
+    else:
+        load_path = name
+    with open(load_path, 'rb') as f:
+        obj = pickle.load(f)
+        logger.info(f'loaded obj from {load_path}')
+        return obj, load_path.as_posix()

@@ -6,7 +6,7 @@ import pandas as pd
 from pcap_parsing.calc_stats import form_df
 from pcap_parsing.packet_iterator import packet_iterator
 from pcap_parsing.parsed_fields import ParsedFields as PF
-from utils import TrafficObjects, mac_addr, ip_to_string, is_mac_addr, is_ip_addr
+from pcap_parsing.ip_utils import TrafficObjects, mac_addr, ip_to_string, is_mac_addr, is_ip_addr
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,9 @@
+import logging
+
 import numpy as np
 import torch
 
-from settings import logger
+logger = logging.getLogger(__name__)
 
 
 def generate_states(model, sample_number, window_size, device='cpu'):

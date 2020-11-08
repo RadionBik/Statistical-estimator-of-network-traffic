@@ -1,13 +1,11 @@
-from collections import defaultdict
 import json
 import pickle
+from collections import defaultdict
 
 import numpy as np
 import pytest
 
-import pcap_parser as estimator
 import settings
-import utils
 from features.gaussian_quantizer import GaussianQuantizer
 from pcap_parsing.device_level import extract_host_stats
 
@@ -30,15 +28,6 @@ def gmm_model():
 @pytest.fixture
 def gmm_state():
     return load_json_states('gmm_skype_from.json')
-
-
-@pytest.fixture
-def traffic_dict():
-    pcapfile = f'{settings.BASE_DIR}/traffic_dumps/skypeLANhome.pcap'
-    return estimator.get_traffic_features(pcapfile,
-                                          type_of_identifier=utils.TrafficObjects.FLOW,
-                                          percentiles=(1, 99),
-                                          min_samples_to_estimate=100)[0]
 
 
 @pytest.fixture

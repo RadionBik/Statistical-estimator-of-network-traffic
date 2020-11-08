@@ -1,8 +1,10 @@
+import logging
+
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from settings import logger
+logger = logging.getLogger(__name__)
 
 
 class ManyToManyDataset(Dataset):

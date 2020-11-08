@@ -5,6 +5,7 @@ import pandas as pd
 import scipy
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.stats import spearmanr, pearsonr
 
 from pcap_parsing.parsed_fields import select_features, ParsedFields
 
@@ -85,3 +86,38 @@ def plot_packets_dist(stats, x=ParsedFields.iat, y=ParsedFields.ps):
             packets = stats[~from_idx]
         scatter_plot_with_kde(packets, x=x, y=y, fig=fig, fig_shifter=idx*4, title=direction)
     plt.tight_layout()
+
+
+def calc_stats(original, generated, prefix='', verbose=True):
+    stats = {}
+    min_len = min(len(original), len(generated))
+    original = original[:min_len]
+    generated = generated[:min_len]
+    stats['series_spearman'] = spearmanr(original, generated)[0]
+    stats['series_pearson'] = pearsonr(original, generated)[0]
+    stats['distr_ks2s'] = scipy.stats.ks_2samp(original, generated)[0]
+    stats['distr_kl_div'] = get_KL_divergence_pdf(original, generated)
+    stats['distr_wasserstein_dist'] = get_wasserstein_distance_pdf(original, generated)
+    if prefix:
+        stats = {f'{prefix}_{key}': value for key, value in stats.items()}
+    if verbose:
+        pprint(stats)
+    return stats
+
+
+def get_KL_divergence_pdf(orig_values, gen_values):
+    x_values = np.linspace(0, max(orig_values), 100)
+    kde_orig = scipy.stats.gaussian_kde(orig_values)(x_values)
+    kde_gen = scipy.stats.gaussian_kde(gen_values)(x_values)
+    return scipy.stats.entropy(kde_orig, kde_gen)
+
+
+def get_wasserstein_distance_pdf(orig_values, gen_values):
+    n_samples = 100
+    x_values = np.linspace(0, max(orig_values), n_samples)
+    kde_orig = scipy.stats.gaussian_kde(orig_values)(x_values)
+    kde_gen = scipy.stats.gaussian_kde(gen_values)(x_values)
+    kde_orig /= sum(kde_orig)
+    kde_gen /= sum(kde_gen)
+
+    return scipy.stats.wasserstein_distance(kde_orig * n_samples, kde_gen * n_samples)

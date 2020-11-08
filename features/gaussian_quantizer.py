@@ -1,12 +1,14 @@
+import logging
 import pathlib
 from typing import Optional
 
 import numpy as np
-from sklearn.mixture import GaussianMixture
+from sklearn.mixture import GaussianMixture, BayesianGaussianMixture
 
 from features.packet_scaler import PacketScaler
-from mixture_models import get_gmm
-from utils import load_obj, save_obj
+from features.data_utils import save_obj, load_obj
+
+logger = logging.getLogger(__name__)
 
 
 class GaussianQuantizer:
@@ -115,3 +117,59 @@ def multivariate_sampling_from_states(model: GaussianMixture, states, random_sta
             size=model.n_features_in_
         )
     return restored_features
+
+
+def get_gmm(
+        df,
+        columns: tuple = None,
+        n_comp=None,
+        min_comp=5,
+        max_comp=20,
+        step_comp=1,
+        sort_components=False,
+        return_bic_dict=False,
+        **kwargs
+):
+
+    if not n_comp:
+        comp_range = range(min_comp, max_comp + 1, step_comp)
+        logger.info(f'Started fitting GMM with auto number of components')
+    else:
+        comp_range = range(n_comp, n_comp + 1)
+        logger.info(f'Started fitting GMM')
+
+    comp_model = {}
+    comp_bic = {}
+    for comp in comp_range:
+        if kwargs:
+            model = BayesianGaussianMixture(n_components=comp,
+                                            covariance_type="full",
+                                            max_iter=500,
+                                            tol=0.001,
+                                            random_state=88,
+                                            **kwargs)
+        else:
+            model = GaussianMixture(n_components=comp,
+                                    covariance_type="full",
+                                    random_state=88)
+
+        df = df[columns] if columns else df
+
+        model.fit(df)
+        comp_model[comp] = model
+        comp_bic[comp] = model.bic(df)
+        logger.info(f'fit model with {comp} components, BIC={comp_bic[comp]}')
+
+    best_comp, best_bic = min(comp_bic.items(), key=lambda x: x[1])
+    best_model = comp_model[best_comp]
+    logger.info(f'Best BIC={best_bic} is with {best_comp} components')
+
+    if sort_components:
+        sorted_indexes = np.linalg.norm(best_model.means_, axis=1).argsort()
+        for attr in ['means_', 'covariances_', 'weights_']:
+            setattr(best_model, attr, getattr(best_model, attr)[sorted_indexes])
+        logger.info('reassigned components numbers according to their sorted norm')
+
+    if return_bic_dict:
+        return best_model, comp_bic
+    return best_model

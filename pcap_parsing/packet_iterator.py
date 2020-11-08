@@ -1,8 +1,9 @@
+import logging
 from typing import Tuple
 
 import dpkt
 
-from settings import logger
+logger = logging.getLogger(__name__)
 
 
 def packet_iterator(pcapfile, payload_only) -> Tuple[float, dpkt.ethernet.Ethernet, dpkt.ip.IP]:
