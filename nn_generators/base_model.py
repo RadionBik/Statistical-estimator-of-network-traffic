@@ -24,7 +24,7 @@ class NNBaseGenerator(LightningModule):
         y_hat = self(x)
         loss = self._calc_loss(y_hat, y)
         self.log('train_loss', loss, on_step=False, on_epoch=True)
-        return {'loss': loss,}
+        return {'loss': loss}
 
     def validation_step(self, batch, batch_idx):
         x, y = batch

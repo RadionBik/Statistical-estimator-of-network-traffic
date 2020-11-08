@@ -11,7 +11,7 @@ class PacketScaler:
         :return: transformed_packets (N, 2)
         """
         packet_pairs[:, 0] = packet_pairs[:, 0] / self.max_packet_len
-        # avoids warning and -inf values. the scale here is in microseconds (?)
+        # avoids warning and -inf values. the values here are integer milliseconds (?)
         zero_iats = np.isclose(packet_pairs[:, 1], 0.)
         packet_pairs[:, 1][zero_iats] = -1
         packet_pairs[:, 1][~zero_iats] = np.log10(packet_pairs[:, 1][~zero_iats])
