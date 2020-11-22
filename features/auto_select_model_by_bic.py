@@ -1,5 +1,8 @@
 import logging
 
+import pandas as pd
+import seaborn as sns
+
 from settings import RANDOM_SEED
 
 logger = logging.getLogger(__name__)
@@ -42,3 +45,11 @@ def auto_select_model_by_bic(
     if return_bic_dict:
         return best_model, comp_bic
     return best_model,
+
+
+def plot_bics(bics: dict, direction):
+    bics_df = pd.DataFrame(bics.items())
+    bics_df.columns = ['Число компонент', 'BIC']
+    ax = sns.regplot(data=bics_df, x='Число компонент', y='BIC',
+                     order=2, label=direction, scatter=True)
+    ax.legend()
