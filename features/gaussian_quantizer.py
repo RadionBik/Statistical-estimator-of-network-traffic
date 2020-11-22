@@ -3,8 +3,9 @@ import pathlib
 from typing import Optional
 
 import numpy as np
-from sklearn.mixture import GaussianMixture, BayesianGaussianMixture
+from sklearn.mixture import GaussianMixture
 
+from features.auto_select_model_by_bic import auto_select_model_by_bic
 from features.packet_scaler import PacketScaler
 from features.data_utils import save_obj, load_obj
 from settings import RANDOM_SEED
@@ -84,16 +85,16 @@ class GaussianQuantizer:
     def fit(self, features, client_direction_vector, **gmm_kwargs):
         scaled_features = self.scaler.transform(features.copy())
 
-        from_out = get_gmm(scaled_features[client_direction_vector], **gmm_kwargs)
-        to_out = get_gmm(scaled_features[~client_direction_vector], **gmm_kwargs)
+        from_out = auto_select_model_by_bic(GaussianMixture, scaled_features[client_direction_vector], **gmm_kwargs)
+        to_out = auto_select_model_by_bic(GaussianMixture, scaled_features[~client_direction_vector], **gmm_kwargs)
 
         bic_dict = {}
         if gmm_kwargs.get('return_bic_dict'):
             self.gmm_from, bic_dict['from'] = from_out
             self.gmm_to, bic_dict['to'] = to_out
         else:
-            self.gmm_from = from_out
-            self.gmm_to = to_out
+            self.gmm_from = from_out[0]
+            self.gmm_to = to_out[0]
 
         self._n_tokens_from = self.gmm_from.n_components
         self._n_tokens_to = self.gmm_to.n_components
@@ -116,59 +117,3 @@ def multivariate_sampling_from_states(model: GaussianMixture, states, random_sta
             size=model.n_features_in_
         )
     return restored_features
-
-
-def get_gmm(
-        df,
-        columns: tuple = None,
-        n_comp=None,
-        min_comp=5,
-        max_comp=20,
-        step_comp=1,
-        sort_components=False,
-        return_bic_dict=False,
-        **kwargs
-):
-
-    if not n_comp:
-        comp_range = range(min_comp, max_comp + 1, step_comp)
-        logger.info(f'Started fitting GMM with auto number of components')
-    else:
-        comp_range = range(n_comp, n_comp + 1)
-        logger.info(f'Started fitting GMM')
-
-    comp_model = {}
-    comp_bic = {}
-    for comp in comp_range:
-        if kwargs:
-            model = BayesianGaussianMixture(n_components=comp,
-                                            covariance_type="full",
-                                            max_iter=500,
-                                            tol=0.001,
-                                            random_state=RANDOM_SEED,
-                                            **kwargs)
-        else:
-            model = GaussianMixture(n_components=comp,
-                                    covariance_type="full",
-                                    random_state=RANDOM_SEED)
-
-        df = df[columns] if columns else df
-
-        model.fit(df)
-        comp_model[comp] = model
-        comp_bic[comp] = model.bic(df)
-        logger.info(f'fit model with {comp} components, BIC={comp_bic[comp]}')
-
-    best_comp, best_bic = min(comp_bic.items(), key=lambda x: x[1])
-    best_model = comp_model[best_comp]
-    logger.info(f'Best BIC={best_bic} is with {best_comp} components')
-
-    if sort_components:
-        sorted_indexes = np.linalg.norm(best_model.means_, axis=1).argsort()
-        for attr in ['means_', 'covariances_', 'weights_']:
-            setattr(best_model, attr, getattr(best_model, attr)[sorted_indexes])
-        logger.info('reassigned components numbers according to their sorted norm')
-
-    if return_bic_dict:
-        return best_model, comp_bic
-    return best_model
