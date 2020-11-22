@@ -1,8 +1,6 @@
 import pathlib
 from typing import Optional
 
-from sklearn.mixture import GaussianMixture
-
 from features.auto_select_model_by_bic import auto_select_model_by_bic
 from features.data_utils import load_obj, save_obj
 from features.packet_scaler import PacketScaler
@@ -11,13 +9,13 @@ from features.packet_scaler import PacketScaler
 class BasePacketTransformer:
     def __init__(
             self,
-            model_from: Optional[GaussianMixture] = None,
-            model_to: Optional[GaussianMixture] = None,
+            model_from: Optional = None,
+            model_to: Optional = None,
             scaler=PacketScaler
     ):
 
-        self.model_from: GaussianMixture = model_from
-        self.model_to: GaussianMixture = model_to
+        self.model_from = model_from
+        self.model_to = model_to
         self.scaler = scaler()
 
     @classmethod
