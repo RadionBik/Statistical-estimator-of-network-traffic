@@ -13,7 +13,7 @@ from pcap_parsing.parsed_fields import select_features, ParsedFields
 from settings import BASE_DIR
 
 
-def plot_bics(bics, direction):
+def plot_bics(bics: dict, direction):
     bics_df = pd.DataFrame(bics.items())
     bics_df.columns = ['Число компонент', 'BIC']
     ax = sns.regplot(data=bics_df, x='Число компонент', y='BIC',

@@ -41,4 +41,4 @@ def raw_host_stats(pcap_file):
 
 @pytest.fixture
 def gaussian_quantizer():
-    return GaussianQuantizer.from_pretrained(STATIC_DIR / 'amazon')
+    return GaussianQuantizer.from_pretrained(STATIC_DIR / 'amazon_gmm')
