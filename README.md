@@ -22,29 +22,42 @@ python pcap_parsing/main.py \
 --flow_level
 ```
 
-Given the target stats, we need to train a gaussian mixture that 
-maps a packet's features to a centroid value, effectively 
-transforming initial features to discrete sequences.
+Given the target stats, there are two approaches to model them:
+1. Train two hidden Markov models (one for each traffic direction), 
+which are already sufficient to recreate network packets of the given flow/device.
 
-```
-python features/train_quantizer.py \
---dataset="traffic_dumps/iot_amazon_echo_44:65:0d:56:cc:d3.csv"
-```
+    ```
+    python hmm_generator/train_evaluate_hmm.py \
+    --dataset="traffic_dumps/iot_amazon_echo_44:65:0d:56:cc:d3.csv" 
+    ```
 
-This allows us to easily use various sequence models, like Markov chains:
-```
-python markov_baseline/train_evaluate_markov.py \
---dataset="traffic_dumps/iot_amazon_echo_44:65:0d:56:cc:d3.csv" \
---quantizer_path="obj/iot_amazon_echo_44:65:0d:56:cc:d3"
-```
-or autoregressive neural networks, either recurrent (RNN) or temporal
-convolutional networks (TCN):
-```
-python nn_generators/train_generator.py \
---dataset="traffic_dumps/iot_amazon_echo_44:65:0d:56:cc:d3.csv" \
---quantizer_path="obj/iot_amazon_echo_44:65:0d:56:cc:d3" \
---generator_name=RNN
-```
+2. Train two gaussian mixtures that 
+map packet features to mixture centroids, 
+effectively transforming initial features to discrete sequences, which are to be
+processed with a dedicated sequence model. 
+This can be viewed as a decomposition of the HMM framework.
+
+    Fit Gaussian mixtures:
+    ```
+    python features/train_quantizer.py \
+    --dataset="traffic_dumps/iot_amazon_echo_44:65:0d:56:cc:d3.csv"
+    ```
+    
+    This allows us to easily use various sequence models, like Markov chains:
+    ```
+    python markov_baseline/train_evaluate_markov.py \
+    --dataset="traffic_dumps/iot_amazon_echo_44:65:0d:56:cc:d3.csv" \
+    --quantizer_path="obj/iot_amazon_echo_44:65:0d:56:cc:d3"
+    ```
+    or autoregressive neural networks, either recurrent (RNN) or temporal
+    convolutional networks (TCN):
+    ```
+    python nn_generators/train_generator.py \
+    --dataset="traffic_dumps/iot_amazon_echo_44:65:0d:56:cc:d3.csv" \
+    --quantizer_path="obj/iot_amazon_echo_44:65:0d:56:cc:d3" \
+    --generator_name=RNN
+    ```
+
  
 ## ITL paper
 

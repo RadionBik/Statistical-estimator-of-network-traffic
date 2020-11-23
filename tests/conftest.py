@@ -40,5 +40,12 @@ def raw_host_stats(pcap_file):
 
 
 @pytest.fixture
+def raw_host_stats_path(raw_host_stats):
+    save_path = STATIC_DIR / 'tmp.csv'
+    raw_host_stats.to_csv(save_path)
+    return save_path
+
+
+@pytest.fixture
 def gaussian_quantizer():
-    return GaussianQuantizer.from_pretrained(STATIC_DIR / 'amazon')
+    return GaussianQuantizer.from_pretrained(STATIC_DIR / 'amazon_gmm')

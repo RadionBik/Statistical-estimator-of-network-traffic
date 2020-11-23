@@ -8,7 +8,7 @@ from pcap_parsing.parsed_fields import select_features
 
 
 def test_sampling(gaussian_quantizer):
-    gmm = gaussian_quantizer.gmm_from
+    gmm = gaussian_quantizer.model_from
     sampled = multivariate_sampling_from_states(gmm, np.zeros(1000))
     expected_first_comp_means = gmm.means_[0]
     first_comp_means = np.mean(sampled, axis=0)

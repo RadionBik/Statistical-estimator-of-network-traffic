@@ -3,22 +3,14 @@ import pathlib
 
 import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
 
+from features.auto_select_model_by_bic import plot_bics
 from features.data_utils import load_train_test_dataset
 from features.evaluation import plot_packets_dist
 from features.gaussian_quantizer import GaussianQuantizer
 from features.packet_scaler import PacketScaler
 from pcap_parsing.parsed_fields import select_features, ParsedFields
 from settings import BASE_DIR
-
-
-def plot_bics(bics, direction):
-    bics_df = pd.DataFrame(bics.items())
-    bics_df.columns = ['Число компонент', 'BIC']
-    ax = sns.regplot(data=bics_df, x='Число компонент', y='BIC',
-                     order=2, label=direction, scatter=True)
-    ax.legend()
 
 
 def main():
