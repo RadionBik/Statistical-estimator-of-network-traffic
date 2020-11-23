@@ -33,7 +33,7 @@ def main():
 
     generator, bic_dict = HMMGenerator().fit(
         *select_features(train_df),
-        min_comp=10, max_comp=120, step_comp=4,
+        min_comp=1, max_comp=40, step_comp=2,
         return_bic_dict=True
     )
     generator.save_pretrained(save_dir)
@@ -43,7 +43,7 @@ def main():
     plt.tight_layout()
     plt.savefig(save_dir / 'BICs.png', dpi=300)
 
-    gen_df = generator.sample_like(test_df)
+    gen_df = generator.sample_packets_like(test_df)
     eval_metrics = evaluate_traffic(gen_df, test_df)
     if args.log_neptune:
         neptune.init(
